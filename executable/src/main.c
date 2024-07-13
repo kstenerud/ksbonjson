@@ -290,7 +290,7 @@ static ksbonjson_encodeStatus parseJsonObject(json_object *obj, KSBONJSONEncodeC
 {
     json_object_object_foreach(obj, key, val)
     {
-        PROPAGATE_ENCODE_ERROR(ksbonjson_addName(ctx, key, strlen(key)));
+        PROPAGATE_ENCODE_ERROR(ksbonjson_addString(ctx, key, strlen(key)));
         parseJsonElement(val, ctx);
    }
     return KSBONJSON_ENCODE_OK;
@@ -400,16 +400,6 @@ static int addObject(DecoderContext* ctx, json_object* obj)
     return KSBONJSON_DECODE_OK;
 }
 
-static ksbonjson_decodeStatus onName(const char* KSBONJSON_RESTRICT name,
-                                     size_t nameLength,
-                                     void* KSBONJSON_RESTRICT userData)
-{
-    DecoderContext* ctx = (DecoderContext*)userData;
-    replaceString(&ctx->nextName, name, nameLength);
-    ctx->stack[ctx->stackIndex].nextIsName = false;
-    return KSBONJSON_DECODE_OK;
-}
-
 static ksbonjson_decodeStatus onBoolean(bool value, void* userData)
 {
     DecoderContext* ctx = (DecoderContext*)userData;
@@ -445,7 +435,17 @@ static ksbonjson_decodeStatus onString(const char* KSBONJSON_RESTRICT value,
                                        void* KSBONJSON_RESTRICT userData)
 {
     DecoderContext* ctx = (DecoderContext*)userData;
-    return addObject(ctx, json_object_new_string_len(value, length));
+    DecoderFrame* frame = &ctx->stack[ctx->stackIndex];
+    if(frame->nextIsName)
+    {
+        replaceString(&ctx->nextName, value, length);
+        frame->nextIsName = false;
+        return KSBONJSON_DECODE_OK;
+    }
+    else
+    {
+        return addObject(ctx, json_object_new_string_len(value, length));
+    }
 }
 
 static ksbonjson_decodeStatus onStringChunk(const char* KSBONJSON_RESTRICT value,
@@ -453,13 +453,13 @@ static ksbonjson_decodeStatus onStringChunk(const char* KSBONJSON_RESTRICT value
                                             bool isLastChunk,
                                             void* KSBONJSON_RESTRICT userData)
 {
-    if(!isLastChunk)
+    if(isLastChunk)
     {
-        // TODO
-        return 10000;
+        return onString(value, length, userData);
     }
-    DecoderContext* ctx = (DecoderContext*)userData;
-    return addObject(ctx, json_object_new_string_len(value, length));
+
+    // TODO
+    return 10000;
 }
 
 static ksbonjson_decodeStatus onBeginObject(void* userData)
@@ -511,7 +511,6 @@ static void init_decoder_context(DecoderContext* ctx)
     ctx->callbacks.onEndData = onEndData;
     ctx->callbacks.onFloat = onFloat;
     ctx->callbacks.onInteger = onInteger;
-    ctx->callbacks.onName = onName;
     ctx->callbacks.onNull = onNull;
     ctx->callbacks.onString = onString;
     ctx->callbacks.onStringChunk = onStringChunk;

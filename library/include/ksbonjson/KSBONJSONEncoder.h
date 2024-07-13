@@ -73,22 +73,22 @@ typedef enum
     KSBONJSON_ENCODE_OK = 0,
     
     /**
-     * The next element requires a name, but a value was added instead.
+     * Expected an object element name, but got a non-string.
      */
     KSBONJSON_ENCODE_EXPECTED_OBJECT_NAME = 1,
     
     /**
-     * Attempted to add a name twice for the same element.
+     * Attempted to close an object while it's expecting a value.
      */
     KSBONJSON_ENCODE_EXPECTED_OBJECT_VALUE = 2,
-    
+
     /**
      * Attempted to add a discrete value while chunking a string.
      */
     KSBONJSON_ENCODE_CHUNKING_STRING = 3,
     
     /**
-     * Passed in a NULL pointer where one is not allowed.
+     * Passed in a NULL pointer.
      */
     KSBONJSON_ENCODE_NULL_POINTER = 4,
     
@@ -96,11 +96,6 @@ typedef enum
      * The document is unbalanced: Either too many or not enough containers were closed.
      */
     KSBONJSON_ENCODE_UNBALANCED_CONTAINERS = 5,
-
-    /**
-     * Attempted to set an object element name while not in an object.
-     */
-    KSBONJSON_ENCODE_NOT_IN_AN_OBJECT = 6,
 
     /**
      * Generic error code that can be returned from addEncodedData().
@@ -167,18 +162,6 @@ KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_endEncode(KSBONJSONEncodeConte
  * @return KSBONJSON_ENCODER_OK if the process was successful.
  */
 KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_terminateDocument(KSBONJSONEncodeContext* context);
-
-/**
- * Add an object field name.
- *
- * @param context The encoding context.
- * @param name The next element's name in the object.
- * @param nameLength The length of the name.
- * @return KSBONJSON_ENCODER_OK if the process was successful.
- */
-KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addName(KSBONJSONEncodeContext* KSBONJSON_RESTRICT context,
-                                                          const char* KSBONJSON_RESTRICT name,
-                                                          size_t nameLength);
 
 /**
  * Add a boolean element.

@@ -121,18 +121,6 @@ typedef enum
 typedef struct KSBONJSONDecodeCallbacks
 {
     /**
-     * Called when an object element's name is decoded.
-     *
-     * @param name The element's name.
-     * @param nameLength The length of the name.
-     * @param userData Data that was specified when calling ksbonjson_decode().
-     * @return KSBONJSON_DECODE_OK if decoding should continue.
-     */
-    ksbonjson_decodeStatus (*onName)(const char* KSBONJSON_RESTRICT name,
-                                     size_t nameLength,
-                                     void* KSBONJSON_RESTRICT userData);
-
-    /**
      * Called when a boolean element value is decoded.
      *
      * @param value The element's value.

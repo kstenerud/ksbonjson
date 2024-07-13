@@ -257,15 +257,7 @@ static ksbonjson_decodeStatus decodeAndReportShortString(DecodeContext* ctx, uin
     SHOULD_HAVE_ROOM_FOR_BYTES(length);
     char* string = (char*)ctx->bufferCurrent;
     ctx->bufferCurrent += length;
-    DecodeFrame* frame = &ctx->stack[ctx->stackDepth];
-    if(frame->isInObject && frame->isExpectingName)
-    {
-        return ctx->callbacks->onName(string, length, ctx->userData);
-    }
-    else
-    {
-        return ctx->callbacks->onString(string, length, ctx->userData);
-    }
+    return ctx->callbacks->onString(string, length, ctx->userData);
 }
 
 static ksbonjson_decodeStatus decodeAndReportLongString(DecodeContext* ctx)
@@ -278,17 +270,9 @@ static ksbonjson_decodeStatus decodeAndReportLongString(DecodeContext* ctx)
     const char* str = (char*)ctx->bufferCurrent;
     ctx->bufferCurrent += length;
     const KSBONJSONDecodeCallbacks* callbacks = ctx->callbacks;
-    DecodeFrame* frame = &ctx->stack[ctx->stackDepth];
     if(!continuation)
     {
-        if(frame->isInObject && frame->isExpectingName)
-        {
-            return callbacks->onName(str, length, ctx->userData);
-        }
-        else
-        {
-            return callbacks->onString(str, length, ctx->userData);
-        }
+        return callbacks->onString(str, length, ctx->userData);
     }
 
     // TODO: chunked element name...

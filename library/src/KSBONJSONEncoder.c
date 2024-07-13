@@ -340,19 +340,6 @@ ksbonjson_encodeStatus ksbonjson_terminateDocument(KSBONJSONEncodeContext* conte
     return KSBONJSON_ENCODE_OK;
 }
 
-ksbonjson_encodeStatus ksbonjson_addName(KSBONJSONEncodeContext* context,
-                                         const char* name,
-                                         size_t nameLength) {
-    KSBONJSONContainerState* state = &context->containers[context->containerDepth];
-    SHOULD_BE_IN_OBJECT();
-    SHOULD_NOT_BE_EXPECTING_OBJECT_VALUE();
-    SHOULD_NOT_BE_CHUNKING_STRING();
-    SHOULD_NOT_BE_NULL(name);
-
-    state->isExpectingName = false;
-    return encodeString(context, name, nameLength);
-}
-
 ksbonjson_encodeStatus ksbonjson_addBoolean(KSBONJSONEncodeContext* context, bool value)
 {
     KSBONJSONContainerState* state = &context->containers[context->containerDepth];
@@ -425,11 +412,10 @@ ksbonjson_encodeStatus ksbonjson_addString(KSBONJSONEncodeContext* context,
                                            size_t valueLength)
 {
     KSBONJSONContainerState* state = &context->containers[context->containerDepth];
-    SHOULD_NOT_BE_EXPECTING_OBJECT_NAME();
     SHOULD_NOT_BE_CHUNKING_STRING();
     SHOULD_NOT_BE_NULL(value);
 
-    state->isExpectingName = true;
+    state->isExpectingName = !state->isExpectingName;
     return encodeString(context, value, valueLength);
 }
 
@@ -439,7 +425,6 @@ ksbonjson_encodeStatus ksbonjson_chunkString(KSBONJSONEncodeContext* context,
                                              bool isLastChunk)
 {
     KSBONJSONContainerState* state = &context->containers[context->containerDepth];
-    SHOULD_NOT_BE_EXPECTING_OBJECT_NAME();
     SHOULD_NOT_BE_NULL(chunk);
 
     if(!state->isChunkingString)
@@ -447,7 +432,10 @@ ksbonjson_encodeStatus ksbonjson_chunkString(KSBONJSONEncodeContext* context,
         PROPAGATE_ERROR(encodeTypeCode(context, TYPE_STRINGLONG));
     }
     state->isChunkingString = !isLastChunk;
-    state->isExpectingName = true;
+    if(isLastChunk)
+    {
+        state->isExpectingName = state->isExpectingName;
+    }
 
     return encodeStringChunk(context, chunk, chunkLength, isLastChunk);
 }
@@ -519,17 +507,15 @@ const char* ksbonjson_encodeStatusDescription(ksbonjson_encodeStatus status)
         case KSBONJSON_ENCODE_OK:
             return "Successful completion";
         case KSBONJSON_ENCODE_EXPECTED_OBJECT_NAME:
-            return "Expected an object element name, but got a value instead";
+            return "Expected an object element name, but got a non-string";
         case KSBONJSON_ENCODE_EXPECTED_OBJECT_VALUE:
-            return "Expected an object element value, but got a name instead";
+            return "Attempted to close an object while it's expecting a value";
         case KSBONJSON_ENCODE_CHUNKING_STRING:
             return "Attempted to add a discrete value while chunking a string";
         case KSBONJSON_ENCODE_NULL_POINTER:
-            return "Passed in a NULL pointer where one is not allowed";
+            return "Passed in a NULL pointer";
         case KSBONJSON_ENCODE_UNBALANCED_CONTAINERS:
             return "Either too many or not enough containers were closed";
-        case KSBONJSON_ENCODE_NOT_IN_AN_OBJECT:
-            return "Attempted to set an object element name while not in an object";
         case KSBONJSON_ENCODE_COULD_NOT_ADD_DATA:
             return "addEncodedData() failed to process the passed in data";
         default:

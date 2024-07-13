@@ -56,38 +56,6 @@ std::ostream &operator<<(std::ostream &os, Event const &e) {
     return os << e.description();
 }
 
-class NameEvent: public Event
-{
-public:
-    NameEvent(std::string name)
-    : name(name)
-    {}
-    NameEvent(const char* name)
-    : name(name)
-    {}
-    NameEvent(const char* name, size_t length)
-    : name(name, length)
-    {}
-    virtual ~NameEvent() {}
-    virtual ksbonjson_encodeStatus operator()(KSBONJSONEncodeContext* ctx) override
-    {
-        return ksbonjson_addName(ctx, name.c_str(), name.length());
-    }
-    virtual std::string description() const override
-    {
-        std::ostringstream str;
-        str << "Name(" << name << ")";
-        return str.str();
-    }
-private:
-    std::string name;
-protected:
-    virtual bool isEqual(const Event& obj) const override {
-        auto v = static_cast<const NameEvent&>(obj);
-        return Event::isEqual(v) && v.name == name;
-    }
-};
-
 class BooleanEvent: public Event
 {
 public:
@@ -406,15 +374,6 @@ public:
     std::vector<std::shared_ptr<Event>> events;
 };
 
-static ksbonjson_decodeStatus onName(const char* KSBONJSON_RESTRICT name,
-                                     size_t nameLength,
-                                     void* KSBONJSON_RESTRICT userData)
-{
-    DecoderContext* ctx = (DecoderContext*)userData;
-    ctx->addEvent(std::make_shared<NameEvent>(name, nameLength));
-    return KSBONJSON_DECODE_OK;
-}
-
 static ksbonjson_decodeStatus onBoolean(bool value, void* userData)
 {
     DecoderContext* ctx = (DecoderContext*)userData;
@@ -500,7 +459,6 @@ static ksbonjson_decodeStatus onEndData(void* userData)
 DecoderContext::DecoderContext()
 : callbacks
 {
-    .onName = onName,
     .onBoolean = onBoolean,
     .onInteger = onInteger,
     .onUInteger = onUInteger,
@@ -791,9 +749,9 @@ TEST(EncodeDecode, object)
     assert_encode_decode(
     {
         std::make_shared<ObjectBeginEvent>(),
-            std::make_shared<NameEvent>("1"), std::make_shared<IntegerEvent>(1),
-            std::make_shared<NameEvent>("2"), std::make_shared<StringEvent>("x"),
-            std::make_shared<NameEvent>("3"), std::make_shared<NullEvent>(),
+            std::make_shared<StringEvent>("1"), std::make_shared<IntegerEvent>(1),
+            std::make_shared<StringEvent>("2"), std::make_shared<StringEvent>("x"),
+            std::make_shared<StringEvent>("3"), std::make_shared<NullEvent>(),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -811,23 +769,23 @@ TEST(EncodeDecode, example)
     assert_encode_decode(
     {
         std::make_shared<ObjectBeginEvent>(),
-            std::make_shared<NameEvent>("a number"),
+            std::make_shared<StringEvent>("a number"),
             std::make_shared<IntegerEvent>(1),
-            std::make_shared<NameEvent>("an array"),
+            std::make_shared<StringEvent>("an array"),
             std::make_shared<ArrayBeginEvent>(),
                 std::make_shared<StringEvent>("x"),
                 std::make_shared<IntegerEvent>(1000),
                 // std::make_shared<FloatEvent>(1.5), TODO
             std::make_shared<ContainerEndEvent>(),
-            std::make_shared<NameEvent>("a null"),
+            std::make_shared<StringEvent>("a null"),
             std::make_shared<NullEvent>(),
-            std::make_shared<NameEvent>("a boolean"),
+            std::make_shared<StringEvent>("a boolean"),
             std::make_shared<BooleanEvent>(true),
-            std::make_shared<NameEvent>("an object"),
+            std::make_shared<StringEvent>("an object"),
             std::make_shared<ObjectBeginEvent>(),
-                std::make_shared<NameEvent>("a"),
+                std::make_shared<StringEvent>("a"),
                 std::make_shared<IntegerEvent>(-100),
-                std::make_shared<NameEvent>("b"),
+                std::make_shared<StringEvent>("b"),
                 std::make_shared<StringEvent>("........................................"),
             std::make_shared<ContainerEndEvent>(),
         std::make_shared<ContainerEndEvent>(),
