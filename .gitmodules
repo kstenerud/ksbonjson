@@ -1,0 +1,9 @@
+[submodule "executable/subprojects/json-c"]
+	path = executable/subprojects/json-c
+	url = https://github.com/json-c/json-c.git
+[submodule "dependencies/json-c"]
+	path = dependencies/json-c
+	url = https://github.com/json-c/json-c.git
+[submodule "dependencies/googletest"]
+	path = dependencies/googletest
+	url = https://github.com/google/googletest.git

@@ -1,0 +1,302 @@
+//
+//  KSBONJSONCodec.h
+//
+//  Created by Karl Stenerud on 2024-07-07.
+//
+//  Copyright (c) 2024 Karl Stenerud. All rights reserved.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall remain in place
+// in this source code.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+//
+
+#ifndef KSBONJSONEncoder_h
+#define KSBONJSONEncoder_h
+
+#include <stdbool.h>
+#include <stdint.h>
+#include <sys/types.h>
+
+
+// ============================================================================
+// Compile-time Configuration
+// ============================================================================
+
+#ifndef KSBONJSON_MAX_CONTAINER_DEPTH
+    #define KSBONJSON_MAX_CONTAINER_DEPTH 200
+#endif
+
+#ifndef KSBONJSON_RESTRICT
+    #ifdef __cplusplus
+        #define KSBONJSON_RESTRICT __restrict__
+    #else
+        #define KSBONJSON_RESTRICT restrict
+    #endif
+#endif
+
+#ifndef KSBONJSON_PUBLIC
+    #if defined _WIN32 || defined __CYGWIN__
+        #define KSBONJSON_PUBLIC __declspec(dllimport)
+    #else
+        #define KSBONJSON_PUBLIC
+    #endif
+#endif
+
+
+// ============================================================================
+// Header
+// ============================================================================
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef enum
+{
+    /**
+     * Everything completed without error
+     */
+    KSBONJSON_ENCODE_OK = 0,
+    
+    /**
+     * The next element requires a name, but a value was added instead.
+     */
+    KSBONJSON_ENCODE_EXPECTED_OBJECT_NAME = 1,
+    
+    /**
+     * Attempted to add a name twice for the same element.
+     */
+    KSBONJSON_ENCODE_EXPECTED_OBJECT_VALUE = 2,
+    
+    /**
+     * Attempted to add a discrete value while chunking a string.
+     */
+    KSBONJSON_ENCODE_CHUNKING_STRING = 3,
+    
+    /**
+     * Passed in a NULL pointer where one is not allowed.
+     */
+    KSBONJSON_ENCODE_NULL_POINTER = 4,
+    
+    /**
+     * The document is unbalanced: Either too many or not enough containers were closed.
+     */
+    KSBONJSON_ENCODE_UNBALANCED_CONTAINERS = 5,
+
+    /**
+     * Attempted to set an object element name while not in an object.
+     */
+    KSBONJSON_ENCODE_NOT_IN_AN_OBJECT = 6,
+
+    /**
+     * Generic error code that can be returned from addEncodedData().
+     *
+     * More specific error codes (> 100) may also be defined by the user if needed.
+     */
+    KSBONJSON_ENCODE_COULD_NOT_ADD_DATA = 100,
+} ksbonjson_encodeStatus;
+
+/**
+ * Function pointer for adding more encoded binary data to the document.
+ *
+ * @param data The binary data to add.
+ * @param dataLength The length of the data.
+ * @param userData user-specified contextual data.
+ * @return KSBONJSON_ENCODER_OK if the operation was successful.
+ */
+typedef ksbonjson_encodeStatus (*KSBONJSONAddEncodedDataFunc)(const uint8_t* KSBONJSON_RESTRICT data,
+                                                              size_t dataLength,
+                                                              void* KSBONJSON_RESTRICT userData);
+
+typedef struct
+{
+    uint8_t isInObject: 1;
+    uint8_t isExpectingName: 1;
+    uint8_t isChunkingString: 1;
+} KSBONJSONContainerState;
+
+typedef struct
+{
+    KSBONJSONAddEncodedDataFunc addEncodedData;
+    void* userData;
+    int containerDepth;
+    KSBONJSONContainerState containers[KSBONJSON_MAX_CONTAINER_DEPTH];
+} KSBONJSONEncodeContext;
+
+
+// ============================================================================
+// API
+// ============================================================================
+
+/**
+ * Begin a new encoding process.
+ *
+ * @param context The encoding context.
+ * @param addEncodedData Function to handle adding data after it's been encoded.
+ * @param userData User-specified data which gets passed to addEncodedData.
+ */
+KSBONJSON_PUBLIC void ksbonjson_beginEncode(KSBONJSONEncodeContext* context,
+                                            KSBONJSONAddEncodedDataFunc addEncodedData,
+                                            void* userData);
+
+/**
+ * End the encoding process.
+ *
+ * @return KSBONJSON_ENCODER_OK if the process was successful.
+ */
+KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_endEncode(KSBONJSONEncodeContext* context);
+
+/**
+ * End all open containers in the document, leaving it in a balanced state ready for ksbonjson_endEncode().
+ *
+ * @param context The encoding context.
+ * @return KSBONJSON_ENCODER_OK if the process was successful.
+ */
+KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_terminateDocument(KSBONJSONEncodeContext* context);
+
+/**
+ * Add an object field name.
+ *
+ * @param context The encoding context.
+ * @param name The next element's name in the object.
+ * @param nameLength The length of the name.
+ * @return KSBONJSON_ENCODER_OK if the process was successful.
+ */
+KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addName(KSBONJSONEncodeContext* KSBONJSON_RESTRICT context,
+                                                          const char* KSBONJSON_RESTRICT name,
+                                                          size_t nameLength);
+
+/**
+ * Add a boolean element.
+ *
+ * @param context The encoding context.
+ * @param value The element's value.
+ * @return KSBONJSON_ENCODER_OK if the process was successful.
+ */
+KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addBoolean(KSBONJSONEncodeContext* context, bool value);
+
+/**
+ * Add an integer element.
+ *
+ * @param context The encoding context.
+ * @param value The element's value.
+ * @return KSBONJSON_ENCODER_OK if the process was successful.
+ */
+KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addInteger(KSBONJSONEncodeContext* context, int64_t value);
+
+/**
+ * Add an unsigned integer element.
+ *
+ * @param context The encoding context.
+ * @param value The element's value.
+ * @return KSBONJSON_ENCODER_OK if the process was successful.
+ */
+KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addUInteger(KSBONJSONEncodeContext* context, uint64_t value);
+    
+/**
+ * Add a floating point element.
+ *
+ * @param context The encoding context.
+ * @param value The element's value.
+ * @return KSBONJSON_ENCODER_OK if the process was successful.
+ */
+KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addFloat(KSBONJSONEncodeContext* context, double value);
+
+/**
+ * Add a null element.
+ *
+ * @param context The encoding context.
+ * @return KSBONJSON_ENCODER_OK if the process was successful.
+ */
+KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addNull(KSBONJSONEncodeContext* context);
+
+/**
+ * Add a string element.
+ *
+ * @param context The encoding context.
+ * @param value The element's value.
+ * @param valueLength the length of the string.
+ * @return KSBONJSON_ENCODER_OK if the process was successful.
+ */
+KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addString(KSBONJSONEncodeContext* KSBONJSON_RESTRICT context,
+                                                            const char* KSBONJSON_RESTRICT value,
+                                                            size_t valueLength);
+
+/**
+ * Build a string element in chunks. When isLastChunk is true, the string is considered complete.
+ *
+ * @param context The encoding context.
+ * @param chunk The string chunk.
+ * @param chunkLength the length of the string chunk.
+ * @param isLastChunk set to true if this chunk also marks the end of the string element.
+ * @return KSBONJSON_ENCODER_OK if the process was successful.
+ */
+KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_chunkString(KSBONJSONEncodeContext* KSBONJSON_RESTRICT context,
+                                                              const char* KSBONJSON_RESTRICT chunk,
+                                                              size_t chunkLength,
+                                                              bool isLastChunk);
+
+/** Add an already encoded BONJSON document as an element.
+ *
+ * @param context The encoding context.
+ * @param bonjsonDocument A valid, encoded BONJSON document.
+ * @param documentLength The length of the BONJSON document.
+ * @return KSBONJSON_ENCODER_OK if the process was successful.
+ */
+KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addBONJSONDocument(KSBONJSONEncodeContext* KSBONJSON_RESTRICT context,
+                                                                     const uint8_t* KSBONJSON_RESTRICT bonjsonDocument,
+                                                                     size_t documentLength);
+
+/**
+ * Begin a new object container.
+ *
+ * @param context The encoding context.
+ * @return KSBONJSON_ENCODER_OK if the process was successful.
+ */
+KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_beginObject(KSBONJSONEncodeContext* context);
+
+/**
+ * Begin a new array container.
+ *
+ * @param context The encoding context.
+ * @return KSBONJSON_ENCODER_OK if the process was successful.
+ */
+KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_beginArray(KSBONJSONEncodeContext* context);
+
+/**
+ * End the current container and return to the next higher level.
+ *
+ * @param context The encoding context.
+ * @return KSBONJSON_ENCODER_OK if the process was successful.
+ */
+KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_endContainer(KSBONJSONEncodeContext* context);
+
+/**
+ * Get a description for an encoding status code.
+ *
+ * @param status The status code.
+ *
+ * @return A statically allocated string describing the status.
+ */
+KSBONJSON_PUBLIC const char* ksbonjson_encodeStatusDescription(ksbonjson_encodeStatus status);
+
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* KSBONJSONEncoder_h */
