@@ -579,8 +579,13 @@ ksbonjson_encodeStatus addEncodedDataCallback(const uint8_t* KSBONJSON_RESTRICT 
 // Test Support
 // ============================================================================
 
-void assert_success(std::vector<std::shared_ptr<Event>> events, std::vector<uint8_t> expected_encoded)
+void assert_encode_decode(std::vector<std::shared_ptr<Event>> events, std::vector<uint8_t> expected_encoded)
 {
+    if(REPORT_ENCODING || REPORT_DECODING)
+    {
+        printf("\n[assert_encode_decode]\n");
+    }
+
     // Encode
     KSBONJSONEncodeContext eContext;
     memset(&eContext, 0, sizeof(eContext));
@@ -616,6 +621,11 @@ void assert_success(std::vector<std::shared_ptr<Event>> events, std::vector<uint
 
 void assert_encode_failure(std::vector<std::shared_ptr<Event>> events)
 {
+    if(REPORT_ENCODING)
+    {
+        printf("\n[assert_encode_failure]\n");
+    }
+
     KSBONJSONEncodeContext eContext;
     memset(&eContext, 0, sizeof(eContext));
     EncoderContext eCtx(10000);
@@ -638,6 +648,11 @@ void assert_encode_failure(std::vector<std::shared_ptr<Event>> events)
 
 void assert_decode_failure(std::vector<uint8_t> document)
 {
+    if(REPORT_DECODING)
+    {
+        printf("\n[assert_decode_failure]\n");
+    }
+
     DecoderContext dCtx;
     size_t decodedOffset = 0;
     ASSERT_NE(KSBONJSON_ENCODE_OK, ksbonjson_decode(document.data(), document.size(), &dCtx.callbacks, &dCtx, &decodedOffset));
@@ -663,9 +678,137 @@ TEST(Decoder, bad_stuff)
     assert_decode_failure({0x92, 0x01, 0x01, 0x93});
 }
 
-TEST(Encoder, example)
+TEST(EncodeDecode, null)
 {
-    assert_success(
+    assert_encode_decode({std::make_shared<NullEvent>()}, {0x6a});
+}
+
+TEST(EncodeDecode, boolean)
+{
+    assert_encode_decode({std::make_shared<BooleanEvent>(true)}, {0x95});
+    assert_encode_decode({std::make_shared<BooleanEvent>(false)}, {0x94});
+}
+
+TEST(EncodeDecode, smallint)
+{
+    assert_encode_decode({std::make_shared<IntegerEvent>(0)}, {0x00});
+    assert_encode_decode({std::make_shared<IntegerEvent>(1)}, {0x01});
+    assert_encode_decode({std::make_shared<IntegerEvent>(-1)}, {0xff});
+    assert_encode_decode({std::make_shared<IntegerEvent>(10)}, {0x0a});
+    assert_encode_decode({std::make_shared<IntegerEvent>(-60)}, {0xc4});
+    assert_encode_decode({std::make_shared<IntegerEvent>(105)}, {0x69});
+    assert_encode_decode({std::make_shared<IntegerEvent>(-106)}, {0x96});
+}
+
+TEST(EncodeDecode, int16)
+{
+    assert_encode_decode({std::make_shared<IntegerEvent>(106)}, {0x6b, 0x6a, 0x00});
+    assert_encode_decode({std::make_shared<IntegerEvent>(-107)}, {0x6b, 0x95, 0xff});
+    assert_encode_decode({std::make_shared<IntegerEvent>(1000)}, {0x6b, 0xe8, 0x03});
+    assert_encode_decode({std::make_shared<IntegerEvent>(-1000)}, {0x6b, 0x18, 0xfc});
+    assert_encode_decode({std::make_shared<IntegerEvent>(0x7fff)}, {0x6b, 0xff, 0x7f});
+    assert_encode_decode({std::make_shared<IntegerEvent>(-0x8000)}, {0x6b, 0x00, 0x80});
+}
+
+TEST(EncodeDecode, float32)
+{
+    // TODO
+}
+
+TEST(EncodeDecode, float64)
+{
+    // TODO
+}
+
+TEST(EncodeDecode, bignumber)
+{
+    // TODO
+}
+
+TEST(EncodeDecode, shortstring)
+{
+    assert_encode_decode({std::make_shared<StringEvent>("")}, {0x70});
+    assert_encode_decode({std::make_shared<StringEvent>("1")}, {0x71, 0x31});
+    assert_encode_decode({std::make_shared<StringEvent>("12")}, {0x72, 0x31, 0x32});
+    assert_encode_decode({std::make_shared<StringEvent>("1234567890123456789012345678901")},
+        {0x8f, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30,
+               0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30,
+               0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30, 0x31,
+        });
+}
+
+TEST(EncodeDecode, longstring)
+{
+    assert_encode_decode({std::make_shared<StringEvent>("12345678901234567890123456789012")},
+        {0x90, 0x40,
+         0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30,
+         0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30,
+         0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30,
+         0x31, 0x32,
+        });
+
+    assert_encode_decode({std::make_shared<StringEvent>("1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890")},
+        {0x90, 0x84, 0x02,
+         0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30,
+         0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30,
+         0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30,
+         0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30,
+         0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30,
+         0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30,
+         0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30,
+         0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30,
+         0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30,
+         0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30,
+         0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30,
+         0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30,
+         0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30,
+        });
+}
+
+TEST(EncodeDecode, array)
+{
+    assert_encode_decode({std::make_shared<ArrayBeginEvent>(), std::make_shared<ContainerEndEvent>()}, {0x91, 0x93});
+    assert_encode_decode(
+    {
+        std::make_shared<ArrayBeginEvent>(),
+            std::make_shared<IntegerEvent>(1),
+            std::make_shared<StringEvent>("x"),
+            std::make_shared<NullEvent>(),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x91,
+            0x01,
+            0x71, 0x78,
+            0x6a,
+        0x93
+    });
+}
+
+TEST(EncodeDecode, object)
+{
+    assert_encode_decode({std::make_shared<ObjectBeginEvent>(), std::make_shared<ContainerEndEvent>()}, {0x92, 0x93});
+    assert_encode_decode(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<NameEvent>("1"), std::make_shared<IntegerEvent>(1),
+            std::make_shared<NameEvent>("2"), std::make_shared<StringEvent>("x"),
+            std::make_shared<NameEvent>("3"), std::make_shared<NullEvent>(),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x92,
+            0x71, 0x31, 0x01,
+            0x71, 0x32, 0x71, 0x78,
+            0x71, 0x33, 0x6a,
+        0x93
+    });
+}
+
+
+TEST(EncodeDecode, example)
+{
+    assert_encode_decode(
     {
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<NameEvent>("a number"),
