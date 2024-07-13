@@ -357,6 +357,10 @@ ksbonjson_encodeStatus ksbonjson_endEncode(KSBONJSONEncodeContext* context)
     {
         return KSBONJSON_ENCODE_CONTAINERS_ARE_STILL_OPEN;
     }
+    unlikely_if(context->containers[context->containerDepth].isChunkingString)
+    {
+        return KSBONJSON_ENCODE_CHUNKING_STRING;
+    }
     return KSBONJSON_ENCODE_OK;
 }
 

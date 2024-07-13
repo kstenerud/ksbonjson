@@ -34,6 +34,9 @@
 #define REPORT_DECODING false
 #define REPORT_ENCODING false
 
+
+#define MARK_UNUSED(x) (void)(x)
+
 // ============================================================================
 // Events
 // ============================================================================
@@ -538,6 +541,16 @@ ksbonjson_encodeStatus addEncodedDataCallback(const uint8_t* KSBONJSON_RESTRICT 
     return ctx->add(data, dataLength);
 }
 
+ksbonjson_encodeStatus addEncodedDataFailCallback(const uint8_t* KSBONJSON_RESTRICT data,
+                                                  size_t dataLength,
+                                                  void* KSBONJSON_RESTRICT userData)
+{
+    MARK_UNUSED(data);
+    MARK_UNUSED(dataLength);
+    MARK_UNUSED(userData);
+    return KSBONJSON_ENCODE_COULD_NOT_ADD_DATA;
+}
+
 
 // ============================================================================
 // Test Support
@@ -960,6 +973,22 @@ TEST(Encoder, object_name)
 
 TEST(Encoder, object_value)
 {
+    assert_encode_failure(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+        std::make_shared<ContainerEndEvent>(),
+    });
+
+    assert_encode_failure(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<IntegerEvent>(1),
+            std::make_shared<StringEvent>("z"),
+        std::make_shared<ContainerEndEvent>(),
+    });
+
     assert_encode_decode(
     {
         std::make_shared<ObjectBeginEvent>(),
@@ -1455,8 +1484,162 @@ TEST(Encoder, array_value)
             0x01,
         0x93,
     });
-
 }
+
+
+// ------------------------------------
+// Failure Modes
+// ------------------------------------
+
+TEST(Encoder, failed_to_add)
+{
+    KSBONJSONEncodeContext eContext;
+    memset(&eContext, 0, sizeof(eContext));
+    EncoderContext eCtx(10000);
+    ksbonjson_beginEncode(&eContext, addEncodedDataFailCallback, &eCtx);
+    ASSERT_NE(KSBONJSON_ENCODE_OK, (*std::make_shared<IntegerEvent>(1))(&eContext));
+}
+
+TEST(Encoder, string_chunking)
+{
+    assert_encode_failure(
+    {
+        std::make_shared<StringChunkEvent>("a", CHUNK_HAS_NEXT),
+    });
+
+    assert_encode_failure(
+    {
+        std::make_shared<StringChunkEvent>("a", CHUNK_HAS_NEXT),
+        std::make_shared<StringChunkEvent>("a", CHUNK_HAS_NEXT),
+        std::make_shared<StringChunkEvent>("a", CHUNK_HAS_NEXT),
+        std::make_shared<StringChunkEvent>("a", CHUNK_HAS_NEXT),
+        std::make_shared<StringChunkEvent>("a", CHUNK_HAS_NEXT),
+    });
+
+    assert_encode_failure(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<StringChunkEvent>("a", CHUNK_HAS_NEXT),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    });
+
+    assert_encode_failure(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<StringChunkEvent>("a", CHUNK_HAS_NEXT),
+        std::make_shared<ContainerEndEvent>(),
+    });
+
+    assert_encode_failure(
+    {
+        std::make_shared<ArrayBeginEvent>(),
+            std::make_shared<StringChunkEvent>("a", CHUNK_HAS_NEXT),
+        std::make_shared<ContainerEndEvent>(),
+    });
+}
+
+TEST(Encoder, containers)
+{
+    assert_encode_failure(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+    });
+
+    assert_encode_failure(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<ObjectBeginEvent>(),
+        std::make_shared<ContainerEndEvent>(),
+    });
+
+    assert_encode_failure(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<ArrayBeginEvent>(),
+        std::make_shared<ContainerEndEvent>(),
+    });
+
+    assert_encode_failure(
+    {
+        std::make_shared<ArrayBeginEvent>(),
+    });
+
+    assert_encode_failure(
+    {
+        std::make_shared<ArrayBeginEvent>(),
+            std::make_shared<ArrayBeginEvent>(),
+        std::make_shared<ContainerEndEvent>(),
+    });
+
+    assert_encode_failure(
+    {
+        std::make_shared<ArrayBeginEvent>(),
+            std::make_shared<ObjectBeginEvent>(),
+        std::make_shared<ContainerEndEvent>(),
+    });
+
+    assert_encode_failure(
+    {
+        std::make_shared<ArrayBeginEvent>(),
+            std::make_shared<ObjectBeginEvent>(),
+                std::make_shared<StringEvent>("a"),
+        std::make_shared<ContainerEndEvent>(),
+    });
+
+    assert_encode_failure(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+        std::make_shared<ContainerEndEvent>(),
+        std::make_shared<ContainerEndEvent>(),
+    });
+
+    assert_encode_failure(
+    {
+        std::make_shared<ArrayBeginEvent>(),
+        std::make_shared<ContainerEndEvent>(),
+        std::make_shared<ContainerEndEvent>(),
+    });
+
+    assert_encode_failure(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<ContainerEndEvent>(),
+        std::make_shared<ContainerEndEvent>(),
+        std::make_shared<ContainerEndEvent>(),
+    });
+
+    assert_encode_failure(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<ArrayBeginEvent>(),
+            std::make_shared<ContainerEndEvent>(),
+        std::make_shared<ContainerEndEvent>(),
+        std::make_shared<ContainerEndEvent>(),
+    });
+
+    assert_encode_failure(
+    {
+        std::make_shared<ArrayBeginEvent>(),
+            std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<ContainerEndEvent>(),
+        std::make_shared<ContainerEndEvent>(),
+        std::make_shared<ContainerEndEvent>(),
+    });
+
+    assert_encode_failure(
+    {
+        std::make_shared<ArrayBeginEvent>(),
+            std::make_shared<ArrayBeginEvent>(),
+            std::make_shared<ContainerEndEvent>(),
+        std::make_shared<ContainerEndEvent>(),
+        std::make_shared<ContainerEndEvent>(),
+    });
+}
+
 
 TEST(Decoder, bad_stuff)
 {
@@ -1479,7 +1662,7 @@ TEST(Example, specification)
             std::make_shared<ArrayBeginEvent>(),
                 std::make_shared<StringEvent>("x"),
                 std::make_shared<IntegerEvent>(1000),
-                // std::make_shared<FloatEvent>(1.5), TODO
+                std::make_shared<FloatEvent>(1.5),
             std::make_shared<ContainerEndEvent>(),
             std::make_shared<StringEvent>("a null"),
             std::make_shared<NullEvent>(),
@@ -1502,7 +1685,7 @@ TEST(Example, specification)
             0x91,
                 0x71, 0x78,
                 0x6b, 0xe8, 0x03,
-                // 0x6f, 0x05, 0x0f, 0x01,
+                0x6c, 0x00, 0x00, 0xc0, 0x3f,
             0x93,
             0x76, 0x61, 0x20, 0x6e, 0x75, 0x6c, 0x6c,
             0x6a,
