@@ -843,11 +843,21 @@ TEST(EncodeDecode, object)
 
 
 // ------------------------------------
-// Failure Tests
+// In-depth Tests
 // ------------------------------------
 
 TEST(Encoder, object_name)
 {
+    assert_encode_decode(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x92,
+        0x93,
+    });
+
     assert_encode_decode(
     {
         std::make_shared<ObjectBeginEvent>(),
@@ -879,6 +889,8 @@ TEST(Encoder, object_name)
         0x93,
     });
 
+    // Non-string is not allowed in the name field
+
     assert_encode_failure(
     {
         std::make_shared<ObjectBeginEvent>(),
@@ -886,6 +898,564 @@ TEST(Encoder, object_name)
             std::make_shared<IntegerEvent>(1),
         std::make_shared<ContainerEndEvent>(),
     });
+
+    assert_encode_failure(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<IntegerEvent>(1000),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    });
+
+    assert_encode_failure(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<IntegerEvent>(0x1000000000000000LL),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    });
+
+    assert_encode_failure(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<BooleanEvent>(true),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    });
+
+    assert_encode_failure(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<FloatEvent>(1.234),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    });
+
+    assert_encode_failure(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<NullEvent>(),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    });
+
+    assert_encode_failure(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<ContainerEndEvent>(),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    });
+
+    assert_encode_failure(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<ArrayBeginEvent>(),
+            std::make_shared<ContainerEndEvent>(),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    });
+}
+
+TEST(Encoder, object_value)
+{
+    assert_encode_decode(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<IntegerEvent>(1),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x92,
+            0x71, 0x61,
+            0x01,
+            0x71, 0x7a,
+            0x01,
+        0x93,
+    });
+
+    assert_encode_decode(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<IntegerEvent>(-1),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x92,
+            0x71, 0x61,
+            0xff,
+            0x71, 0x7a,
+            0x01,
+        0x93,
+    });
+
+    assert_encode_decode(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<IntegerEvent>(1000),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x92,
+            0x71, 0x61,
+            0x6b, 0xe8, 0x03,
+            0x71, 0x7a,
+            0x01,
+        0x93,
+    });
+
+    assert_encode_decode(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<IntegerEvent>(0x1000000000000000LL),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x92,
+            0x71, 0x61,
+            0x6e, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10,
+            0x71, 0x7a,
+            0x01,
+        0x93,
+    });
+
+    assert_encode_decode(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<IntegerEvent>(-0x1000000000000000LL),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x92,
+            0x71, 0x61,
+            0x6f, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10,
+            0x71, 0x7a,
+            0x01,
+        0x93,
+    });
+
+    assert_encode_decode(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<FloatEvent>(1.25),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x92,
+            0x71, 0x61,
+            0x6c, 0x00, 0x00, 0xa0, 0x3f,
+            0x71, 0x7a,
+            0x01,
+        0x93,
+    });
+
+    assert_encode_decode(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<FloatEvent>(-5.923441e-50),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x92,
+            0x71, 0x61,
+            0x6d, 0x35, 0x3c, 0xce, 0x81, 0x87, 0x29, 0xb6, 0xb5,
+            0x71, 0x7a,
+            0x01,
+        0x93,
+    });
+
+    assert_encode_decode(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<StringEvent>("b"),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x92,
+            0x71, 0x61,
+            0x71, 0x62,
+            0x71, 0x7a,
+            0x01,
+        0x93,
+    });
+
+    assert_encode_decode(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<StringChunkEvent>("b", CHUNK_HAS_NEXT),
+            std::make_shared<StringChunkEvent>("c", CHUNK_HAS_NEXT),
+            std::make_shared<StringChunkEvent>("d", CHUNK_HAS_NEXT),
+            std::make_shared<StringChunkEvent>("e", CHUNK_LAST),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x92,
+            0x71, 0x61,
+            0x90, 0x03, 0x62, 0x03, 0x63, 0x03, 0x64, 0x02, 0x65,
+            0x71, 0x7a,
+            0x01,
+        0x93,
+    });
+
+    assert_encode_decode(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<BooleanEvent>(false),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x92,
+            0x71, 0x61,
+            0x94,
+            0x71, 0x7a,
+            0x01,
+        0x93,
+    });
+
+    assert_encode_decode(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<NullEvent>(),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x92,
+            0x71, 0x61,
+            0x6a,
+            0x71, 0x7a,
+            0x01,
+        0x93,
+    });
+
+    assert_encode_decode(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<ContainerEndEvent>(),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x92,
+            0x71, 0x61,
+            0x92,
+            0x93,
+            0x71, 0x7a,
+            0x01,
+        0x93,
+    });
+
+    assert_encode_decode(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<ArrayBeginEvent>(),
+            std::make_shared<ContainerEndEvent>(),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x92,
+            0x71, 0x61,
+            0x91,
+            0x93,
+            0x71, 0x7a,
+            0x01,
+        0x93,
+    });
+
+}
+
+TEST(Encoder, array_value)
+{
+    assert_encode_decode(
+    {
+        std::make_shared<ArrayBeginEvent>(),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x91,
+        0x93,
+    });
+
+    assert_encode_decode(
+    {
+        std::make_shared<ArrayBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<IntegerEvent>(1),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x91,
+            0x71, 0x61,
+            0x01,
+            0x71, 0x7a,
+            0x01,
+        0x93,
+    });
+
+    assert_encode_decode(
+    {
+        std::make_shared<ArrayBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<IntegerEvent>(-1),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x91,
+            0x71, 0x61,
+            0xff,
+            0x71, 0x7a,
+            0x01,
+        0x93,
+    });
+
+    assert_encode_decode(
+    {
+        std::make_shared<ArrayBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<IntegerEvent>(1000),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x91,
+            0x71, 0x61,
+            0x6b, 0xe8, 0x03,
+            0x71, 0x7a,
+            0x01,
+        0x93,
+    });
+
+    assert_encode_decode(
+    {
+        std::make_shared<ArrayBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<IntegerEvent>(0x1000000000000000LL),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x91,
+            0x71, 0x61,
+            0x6e, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10,
+            0x71, 0x7a,
+            0x01,
+        0x93,
+    });
+
+    assert_encode_decode(
+    {
+        std::make_shared<ArrayBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<IntegerEvent>(-0x1000000000000000LL),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x91,
+            0x71, 0x61,
+            0x6f, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10,
+            0x71, 0x7a,
+            0x01,
+        0x93,
+    });
+
+    assert_encode_decode(
+    {
+        std::make_shared<ArrayBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<FloatEvent>(1.25),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x91,
+            0x71, 0x61,
+            0x6c, 0x00, 0x00, 0xa0, 0x3f,
+            0x71, 0x7a,
+            0x01,
+        0x93,
+    });
+
+    assert_encode_decode(
+    {
+        std::make_shared<ArrayBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<FloatEvent>(-5.923441e-50),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x91,
+            0x71, 0x61,
+            0x6d, 0x35, 0x3c, 0xce, 0x81, 0x87, 0x29, 0xb6, 0xb5,
+            0x71, 0x7a,
+            0x01,
+        0x93,
+    });
+
+    assert_encode_decode(
+    {
+        std::make_shared<ArrayBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<StringEvent>("b"),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x91,
+            0x71, 0x61,
+            0x71, 0x62,
+            0x71, 0x7a,
+            0x01,
+        0x93,
+    });
+
+    assert_encode_decode(
+    {
+        std::make_shared<ArrayBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<StringChunkEvent>("b", CHUNK_HAS_NEXT),
+            std::make_shared<StringChunkEvent>("c", CHUNK_HAS_NEXT),
+            std::make_shared<StringChunkEvent>("d", CHUNK_HAS_NEXT),
+            std::make_shared<StringChunkEvent>("e", CHUNK_LAST),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x91,
+            0x71, 0x61,
+            0x90, 0x03, 0x62, 0x03, 0x63, 0x03, 0x64, 0x02, 0x65,
+            0x71, 0x7a,
+            0x01,
+        0x93,
+    });
+
+    assert_encode_decode(
+    {
+        std::make_shared<ArrayBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<BooleanEvent>(false),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x91,
+            0x71, 0x61,
+            0x94,
+            0x71, 0x7a,
+            0x01,
+        0x93,
+    });
+
+    assert_encode_decode(
+    {
+        std::make_shared<ArrayBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<NullEvent>(),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x91,
+            0x71, 0x61,
+            0x6a,
+            0x71, 0x7a,
+            0x01,
+        0x93,
+    });
+
+    assert_encode_decode(
+    {
+        std::make_shared<ArrayBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<ContainerEndEvent>(),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x91,
+            0x71, 0x61,
+            0x92,
+            0x93,
+            0x71, 0x7a,
+            0x01,
+        0x93,
+    });
+
+    assert_encode_decode(
+    {
+        std::make_shared<ArrayBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<ArrayBeginEvent>(),
+            std::make_shared<ContainerEndEvent>(),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x91,
+            0x71, 0x61,
+            0x91,
+            0x93,
+            0x71, 0x7a,
+            0x01,
+        0x93,
+    });
+
 }
 
 TEST(Decoder, bad_stuff)
