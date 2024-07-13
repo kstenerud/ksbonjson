@@ -38,6 +38,12 @@
 // Events
 // ============================================================================
 
+typedef enum
+{
+    CHUNK_HAS_NEXT,
+    CHUNK_LAST
+} CHUNK_MODE;
+
 class Event
 {
 public:
@@ -214,22 +220,22 @@ protected:
 class StringChunkEvent: public Event
 {
 public:
-    StringChunkEvent(std::string value, bool isLastChunk)
+    StringChunkEvent(std::string value, CHUNK_MODE chunkMode)
     : value(value)
-    , isLastChunk(isLastChunk)
+    , chunkMode(chunkMode)
     {}
-    StringChunkEvent(const char* value, bool isLastChunk)
+    StringChunkEvent(const char* value, CHUNK_MODE chunkMode)
     : value(value)
-    , isLastChunk(isLastChunk)
+    , chunkMode(chunkMode)
     {}
-    StringChunkEvent(const char* value, size_t length, bool isLastChunk)
+    StringChunkEvent(const char* value, size_t length, CHUNK_MODE chunkMode)
     : value(value, length)
-    , isLastChunk(isLastChunk)
+    , chunkMode(chunkMode)
     {}
     virtual ~StringChunkEvent() {}
     virtual ksbonjson_encodeStatus operator()(KSBONJSONEncodeContext* ctx) override
     {
-        return ksbonjson_chunkString(ctx, value.c_str(), value.length(), isLastChunk);
+        return ksbonjson_chunkString(ctx, value.c_str(), value.length(), chunkMode == CHUNK_LAST);
     }
     virtual std::string description() const override
     {
@@ -239,11 +245,11 @@ public:
     }
 private:
     std::string value;
-    bool isLastChunk;
+    CHUNK_MODE chunkMode;
 protected:
     virtual bool isEqual(const Event& obj) const override {
         auto v = static_cast<const StringChunkEvent&>(obj);
-        return Event::isEqual(v) && (v.value == value) && (v.isLastChunk = isLastChunk);
+        return Event::isEqual(v) && (v.value == value) && (v.chunkMode = chunkMode);
     }
 };
 
@@ -424,7 +430,7 @@ static ksbonjson_decodeStatus onStringChunk(const char* KSBONJSON_RESTRICT value
                                             void* KSBONJSON_RESTRICT userData)
 {
     DecoderContext* ctx = (DecoderContext*)userData;
-    ctx->addEvent(std::make_shared<StringChunkEvent>(value, length, isLastChunk));
+    ctx->addEvent(std::make_shared<StringChunkEvent>(value, length, isLastChunk ? CHUNK_LAST : CHUNK_HAS_NEXT));
     return KSBONJSON_DECODE_OK;
 }
 
@@ -840,8 +846,39 @@ TEST(EncodeDecode, object)
 // Failure Tests
 // ------------------------------------
 
-TEST(Encoder, bad_stuff)
+TEST(Encoder, object_name)
 {
+    assert_encode_decode(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        0x92,
+            0x71, 0x61,
+            0x01,
+        0x93,
+    });
+
+    assert_encode_decode(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<StringChunkEvent>("a", CHUNK_HAS_NEXT),
+            std::make_shared<StringChunkEvent>("bc", CHUNK_HAS_NEXT),
+            std::make_shared<StringChunkEvent>("d", CHUNK_LAST),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    },
+
+    {
+        0x92,
+            0x90, 0x03, 0x61, 0x05, 0x62, 0x63, 0x02, 0x64,
+            0x01,
+        0x93,
+    });
+
     assert_encode_failure(
     {
         std::make_shared<ObjectBeginEvent>(),

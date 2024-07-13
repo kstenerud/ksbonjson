@@ -40,10 +40,6 @@
     #define KSBONJSON_MAX_CONTAINER_DEPTH 200
 #endif
 
-#ifndef KSBONJSON_DECODE_MAX_CHUNKED_NAME_LENGTH
-    #define KSBONJSON_DECODE_MAX_CHUNKED_NAME_LENGTH 1000
-#endif
-
 #ifndef KSBONJSON_RESTRICT
     #ifdef __cplusplus
         #define KSBONJSON_RESTRICT __restrict__

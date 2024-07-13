@@ -465,7 +465,7 @@ ksbonjson_encodeStatus ksbonjson_chunkString(KSBONJSONEncodeContext* context,
     state->isChunkingString = !isLastChunk;
     if(isLastChunk)
     {
-        state->isExpectingName = state->isExpectingName;
+        state->isExpectingName = !state->isExpectingName;
     }
 
     return encodeStringChunk(context, chunk, chunkLength, isLastChunk);

@@ -275,9 +275,6 @@ static ksbonjson_decodeStatus decodeAndReportLongString(DecodeContext* ctx)
         return callbacks->onString(str, length, ctx->userData);
     }
 
-    // TODO: chunked element name...
-    // TODO: Max name length
-
     PROPAGATE_ERROR(ctx, callbacks->onStringChunk(str,
                                                   length,
                                                   !continuation,
@@ -288,6 +285,7 @@ static ksbonjson_decodeStatus decodeAndReportLongString(DecodeContext* ctx)
         continuation = header & 1;
         length = header >> 1;
         SHOULD_HAVE_ROOM_FOR_BYTES(length);
+        ctx->bufferCurrent += length;
         PROPAGATE_ERROR(ctx, callbacks->onStringChunk((char*)ctx->bufferCurrent,
                                                       length,
                                                       !continuation,
