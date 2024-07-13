@@ -29,7 +29,7 @@
 
 
 // ============================================================================
-#pragma mark - Helpers -
+// Helpers
 // ============================================================================
 
 // Compiler hints for "if" statements
@@ -76,7 +76,7 @@ union float64_u
 };
 
 // ============================================================================
-#pragma mark - Implementation -
+// Implementation
 // ============================================================================
 
 typedef struct
@@ -437,7 +437,7 @@ static ksbonjson_decodeStatus decode(DecodeContext* const ctx)
 
 
 // ============================================================================
-#pragma mark - API -
+// API
 // ============================================================================
 
 ksbonjson_decodeStatus ksbonjson_decode(const uint8_t* document,

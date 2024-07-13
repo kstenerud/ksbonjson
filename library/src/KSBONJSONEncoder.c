@@ -29,7 +29,7 @@
 
 
 // ============================================================================
-#pragma mark - Helpers -
+// Helpers
 // ============================================================================
 
 // Compiler hints for "if" statements
@@ -77,7 +77,7 @@ union float64_u
 
 
 // ============================================================================
-#pragma mark - Implementation -
+// Implementation
 // ============================================================================
 
 #define PROPAGATE_ERROR(CALL) \
@@ -310,7 +310,7 @@ static ksbonjson_encodeStatus encodeFloat64(KSBONJSONEncodeContext* const contex
 
 
 // ============================================================================
-#pragma mark - API -
+// API
 // ============================================================================
 
 void ksbonjson_beginEncode(KSBONJSONEncodeContext* const context,

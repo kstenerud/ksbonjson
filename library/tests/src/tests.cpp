@@ -43,6 +43,7 @@ class Event
 public:
     virtual ksbonjson_encodeStatus operator()(KSBONJSONEncodeContext* ctx) = 0;
     virtual std::string description() const = 0;
+    virtual ~Event() {}
 protected:
     friend bool operator==(const Event&, const Event&);
     virtual bool isEqual(const Event&) const {return true;};

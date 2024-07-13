@@ -96,6 +96,7 @@ if not meson.is_subproject()
       dependencies : [project_dep, test_dep],
       install : false,
       include_directories : private_headers,
+      override_options : ['warning_level=2'],
     )
   )
 endif
