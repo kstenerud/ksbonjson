@@ -78,7 +78,7 @@ typedef enum
     KSBONJSON_ENCODE_EXPECTED_OBJECT_NAME = 1,
     
     /**
-     * Attempted to close an object while it's expecting a value.
+     * Attempted to close an object while it's expecting a value for the current name.
      */
     KSBONJSON_ENCODE_EXPECTED_OBJECT_VALUE = 2,
 
@@ -93,9 +93,14 @@ typedef enum
     KSBONJSON_ENCODE_NULL_POINTER = 4,
     
     /**
-     * The document is unbalanced: Either too many or not enough containers were closed.
+     * Attempted to close more containers than there actually are.
      */
-    KSBONJSON_ENCODE_UNBALANCED_CONTAINERS = 5,
+    KSBONJSON_ENCODE_CLOSED_TOO_MANY_CONTAINERS = 5,
+
+    /**
+     * Attempted to end the encoding while there are still containers open.
+     */
+    KSBONJSON_ENCODE_CONTAINERS_ARE_STILL_OPEN = 6,
 
     /**
      * Generic error code that can be returned from addEncodedData().

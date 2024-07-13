@@ -326,7 +326,7 @@ ksbonjson_encodeStatus ksbonjson_endEncode(KSBONJSONEncodeContext* context)
 {
     unlikely_if(context->containerDepth > 0)
     {
-        return KSBONJSON_ENCODE_UNBALANCED_CONTAINERS;
+        return KSBONJSON_ENCODE_CONTAINERS_ARE_STILL_OPEN;
     }
     return KSBONJSON_ENCODE_OK;
 }
@@ -490,7 +490,7 @@ ksbonjson_encodeStatus ksbonjson_endContainer(KSBONJSONEncodeContext* context)
     SHOULD_NOT_BE_CHUNKING_STRING();
     unlikely_if(context->containerDepth <= 0)
     {
-        return KSBONJSON_ENCODE_UNBALANCED_CONTAINERS;
+        return KSBONJSON_ENCODE_CLOSED_TOO_MANY_CONTAINERS;
     }
 
     PROPAGATE_ERROR(encodeTypeCode(context, TYPE_END));
@@ -509,13 +509,15 @@ const char* ksbonjson_encodeStatusDescription(ksbonjson_encodeStatus status)
         case KSBONJSON_ENCODE_EXPECTED_OBJECT_NAME:
             return "Expected an object element name, but got a non-string";
         case KSBONJSON_ENCODE_EXPECTED_OBJECT_VALUE:
-            return "Attempted to close an object while it's expecting a value";
+            return "Attempted to close an object while it's expecting a value for the current name";
         case KSBONJSON_ENCODE_CHUNKING_STRING:
             return "Attempted to add a discrete value while chunking a string";
         case KSBONJSON_ENCODE_NULL_POINTER:
             return "Passed in a NULL pointer";
-        case KSBONJSON_ENCODE_UNBALANCED_CONTAINERS:
-            return "Either too many or not enough containers were closed";
+        case KSBONJSON_ENCODE_CLOSED_TOO_MANY_CONTAINERS:
+            return "Attempted to close more containers than there actually are";
+        case KSBONJSON_ENCODE_CONTAINERS_ARE_STILL_OPEN:
+            return "Attempted to end the encoding while there are still containers open";
         case KSBONJSON_ENCODE_COULD_NOT_ADD_DATA:
             return "addEncodedData() failed to process the passed in data";
         default:
