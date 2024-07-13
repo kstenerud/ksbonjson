@@ -244,7 +244,7 @@ static ksbonjson_decodeStatus decodeAndReportNegativeBigNumber(DecodeContext* ct
     int exponent = 0;
     PROPAGATE_ERROR(ctx, decodeBigNumber(ctx, &significand, &exponent));
     // TODO: handle exponent
-    unlikely_if(significand > INT64_MAX)
+    unlikely_if(significand > 0x8000000000000000ULL)
     {
         return KSBONJSON_DECODE_TOO_BIG;
     }
