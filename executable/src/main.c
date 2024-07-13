@@ -49,6 +49,8 @@
 #define likely_if(x) if(__builtin_expect(x,1))
 #define unlikely_if(x) if(__builtin_expect(x,0))
 
+#define MARK_UNUSED(x) (void)(x)
+
 static void printErrorArgs(const char* const fmt, va_list args)
 {
     vfprintf(stderr, fmt, args);
@@ -494,8 +496,9 @@ static ksbonjson_decodeStatus onEndContainer(void* userData)
     return KSBONJSON_DECODE_OK;
 }
 
-static ksbonjson_decodeStatus onEndData(void* __unused userData)
+static ksbonjson_decodeStatus onEndData(void* userData)
 {
+    MARK_UNUSED(userData);
     return KSBONJSON_DECODE_OK;
 }
 
