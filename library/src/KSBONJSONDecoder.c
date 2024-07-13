@@ -25,7 +25,6 @@
 //
 
 #include <ksbonjson/KSBONJSONDecoder.h>
-#include <stddef.h>
 
 
 // ============================================================================
