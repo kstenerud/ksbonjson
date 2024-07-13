@@ -337,28 +337,6 @@ static ksbonjson_encodeStatus encodeFloat64(KSBONJSONEncodeContext* const contex
     } \
     while(0)
 
-#define TRY_ENCODE_BIGINT_NEGATIVE(VALUE, FROM_TYPE) \
-    do \
-    { \
-        int64_t i64Val = (int64_t)(VALUE); \
-        if(i64Val < 0 && (FROM_TYPE)i64Val == (VALUE)) \
-        { \
-            return encodeBigInt(context, TYPE_BIGNEGATIVE, i64Val); \
-        } \
-    } \
-    while(0)
-
-#define TRY_ENCODE_BIGINT_POSITIVE(VALUE, FROM_TYPE) \
-    do \
-    { \
-        uint64_t ui64Val = (uint64_t)(VALUE); \
-        if((FROM_TYPE)ui64Val == (VALUE)) \
-        { \
-            return encodeBigInt(context, TYPE_BIGPOSITIVE, ui64Val); \
-        } \
-    } \
-    while(0)
-
 
 // ============================================================================
 // API
@@ -409,11 +387,13 @@ ksbonjson_encodeStatus ksbonjson_addFloat(KSBONJSONEncodeContext* context, doubl
     SHOULD_NOT_BE_CHUNKING_STRING();
 
     state->isExpectingName = true;
-    TRY_ENCODE_I8(value, double);
-    TRY_ENCODE_I16(value, double);
+    {
+        int64_t asInt64 = (int64_t)value;
+        if((double)asInt64 == value) {
+            return ksbonjson_addInteger(context, asInt64);
+        }
+    }
     TRY_ENCODE_F32(value, double);
-    TRY_ENCODE_BIGINT_NEGATIVE(value, double);
-    TRY_ENCODE_BIGINT_POSITIVE(value, double);
     return encodeFloat64(context, value);
 }
 
