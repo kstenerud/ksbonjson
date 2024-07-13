@@ -620,21 +620,10 @@ void assert_decode_failure(std::vector<uint8_t> document)
 // Tests
 // ============================================================================
 
-TEST(Encoder, bad_stuff)
-{
-    assert_encode_failure(
-    {
-        std::make_shared<ObjectBeginEvent>(),
-            std::make_shared<IntegerEvent>(1),
-            std::make_shared<IntegerEvent>(1),
-        std::make_shared<ContainerEndEvent>(),
-    });
-}
 
-TEST(Decoder, bad_stuff)
-{
-    assert_decode_failure({0x92, 0x01, 0x01, 0x93});
-}
+// ------------------------------------
+// Basic Tests
+// ------------------------------------
 
 TEST(EncodeDecode, null)
 {
@@ -764,7 +753,32 @@ TEST(EncodeDecode, object)
 }
 
 
-TEST(EncodeDecode, example)
+// ------------------------------------
+// Failure Tests
+// ------------------------------------
+
+TEST(Encoder, bad_stuff)
+{
+    assert_encode_failure(
+    {
+        std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1),
+        std::make_shared<ContainerEndEvent>(),
+    });
+}
+
+TEST(Decoder, bad_stuff)
+{
+    assert_decode_failure({0x92, 0x01, 0x01, 0x93});
+}
+
+
+// ------------------------------------
+// Example Tests
+// ------------------------------------
+
+TEST(Example, specification)
 {
     assert_encode_decode(
     {
