@@ -373,7 +373,7 @@ static ksbonjson_decodeStatus decodeAndReportLongString(DecodeContext* ctx)
     const char* str = (char*)ctx->bufferCurrent;
     ctx->bufferCurrent += length;
     const KSBONJSONDecodeCallbacks* callbacks = ctx->callbacks;
-    if(!continuation)
+    likely_if(!continuation) // The most common pattern is single chunk
     {
         return callbacks->onString(str, length, ctx->userData);
     }
@@ -401,7 +401,7 @@ static ksbonjson_decodeStatus decodeAndReportLongString(DecodeContext* ctx)
 
 static ksbonjson_decodeStatus stackContainer(DecodeContext* ctx, bool isObject)
 {
-    if(ctx->stackDepth > KSBONJSON_MAX_CONTAINER_DEPTH)
+    unlikely_if(ctx->stackDepth > KSBONJSON_MAX_CONTAINER_DEPTH)
     {
         return KSBONJSON_DECODE_CONTAINER_DEPTH_EXCEEDED;
     }
@@ -416,7 +416,7 @@ static ksbonjson_decodeStatus stackContainer(DecodeContext* ctx, bool isObject)
 
 static ksbonjson_decodeStatus unstackContainer(DecodeContext* ctx)
 {
-    if(ctx->stackDepth <= 0)
+    unlikely_if(ctx->stackDepth <= 0)
     {
         return KSBONJSON_DECODE_UNBALANCED_CONTAINERS;
     }
@@ -433,7 +433,7 @@ static ksbonjson_decodeStatus decode(DecodeContext* const ctx)
     #define SHOULD_NOT_BE_EXPECTING_NAME() \
         do \
         { \
-            if(currentFrame->isInObject && currentFrame->isExpectingName) \
+            unlikely_if(currentFrame->isInObject && currentFrame->isExpectingName) \
             { \
                 return KSBONJSON_DECODE_EXPECTED_STRING; \
             } \
@@ -525,7 +525,7 @@ static ksbonjson_decodeStatus decode(DecodeContext* const ctx)
         currentFrame->isExpectingName = !currentFrame->isExpectingName;
     }
 
-    if(ctx->stackDepth > 0)
+    unlikely_if(ctx->stackDepth > 0)
     {
         return KSBONJSON_DECODE_UNCLOSED_CONTAINERS;
     }
