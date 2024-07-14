@@ -40,12 +40,13 @@
 #define unlikely_if(x) if(__builtin_expect(x,0))
 
 enum {
-    TYPE_NULL = 0x6a,
-    TYPE_INT16 = 0x6b,
-    TYPE_FLOAT32 = 0x6c,
-    TYPE_FLOAT64 = 0x6d,
-    TYPE_BIGPOSITIVE = 0x6e,
-    TYPE_BIGNEGATIVE = 0x6f,
+    TYPE_NULL = 0x69,
+    TYPE_INT16 = 0x6a,
+    TYPE_INT32 = 0x6b,
+    TYPE_INT64 = 0x6c,
+    TYPE_UINT64 = 0x6d,
+    TYPE_FLOAT32 = 0x6e,
+    TYPE_FLOAT64 = 0x6f,
     TYPE_STRINGSHORT = 0x70,
     TYPE_STRINGLONG = 0x90,
     TYPE_ARRAY = 0x91,
@@ -53,10 +54,12 @@ enum {
     TYPE_END = 0x93,
     TYPE_FALSE = 0x94,
     TYPE_TRUE = 0x95,
+    TYPE_BIGPOSITIVE = 0x96,
+    TYPE_BIGNEGATIVE = 0x97,
 };
 
-#define SMALLINT_MAX 0x69
-#define SMALLINT_MIN 0x96
+#define SMALLINT_MAX 0x68
+#define SMALLINT_MIN 0x98
 
 union uint16_u
 {
