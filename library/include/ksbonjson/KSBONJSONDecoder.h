@@ -36,14 +36,26 @@
 // Compile-time Configuration
 // ============================================================================
 
+/**
+ * Maximum depth of objects / arrays before the library will abort processing.
+ * This increases encoder and decoder memory usage by 1 byte per level.
+ */
 #ifndef KSBONJSON_MAX_CONTAINER_DEPTH
 #   define KSBONJSON_MAX_CONTAINER_DEPTH 200
 #endif
 
+/**
+ * If memcpy is not used, this library will have zero dependencies.
+ * However, if your compiler supports memcpy intrinsics, it may have
+ * zero dependencies regardless.
+ */
 #ifndef KSBONJSON_USE_MEMCPY
 #   define KSBONJSON_USE_MEMCPY 1
 #endif
 
+/**
+ * Restrict, if available, increases optimization opportunities.
+ */
 #ifndef KSBONJSON_RESTRICT
 #   ifdef __cplusplus
 #       define KSBONJSON_RESTRICT __restrict__
@@ -52,6 +64,9 @@
 #   endif
 #endif
 
+/**
+ * If your compiler makes symbols private by default, you will need to define this.
+ */
 #ifndef KSBONJSON_PUBLIC
 #   if defined _WIN32 || defined __CYGWIN__
 #       define KSBONJSON_PUBLIC __declspec(dllimport)
@@ -60,8 +75,13 @@
 #   endif
 #endif
 
+/**
+ * Best-effort attempt to get the endianness of the machine being compiled for.
+ * If this fails, you will have to define it manually.
+ *
+ * Shamelessly stolen from https://github.com/Tencent/rapidjson/blob/master/include/rapidjson/rapidjson.h
+ */
 #ifndef KSBONJSON_IS_LITTLE_ENDIAN
-// Shamelessly stolen from https://github.com/Tencent/rapidjson/blob/master/include/rapidjson/rapidjson.h
 // Detect with GCC 4.6's macro
 #  ifdef __BYTE_ORDER__
 #    if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
