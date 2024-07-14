@@ -526,13 +526,10 @@ ksbonjson_encodeStatus ksbonjson_addFloat(KSBONJSONEncodeContext* context, doubl
     SHOULD_NOT_BE_CHUNKING_STRING();
 
     state->isExpectingName = true;
-    {
-        int64_t asInt64 = (int64_t)value;
-        if((double)asInt64 == value) {
-            return ksbonjson_addInteger(context, asInt64);
-        }
-    }
-    TRY_ENCODE_F32(value, double);
+    TRY_ENCODE_INT(16, value, double); // 3 bytes
+    TRY_ENCODE_INT(32, value, double); // 5 bytes
+    TRY_ENCODE_F32(value, double);     // 5 bytes
+    TRY_ENCODE_INT(64, value, double); // 9 bytes
     return encodeFloat64(context, value);
 }
 
