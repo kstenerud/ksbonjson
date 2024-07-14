@@ -58,21 +58,21 @@ enum {
 union uint16_u
 {
     uint16_t u16;
-    uint8_t bytes[2];
+    uint8_t b[2];
 };
 
 union float32_u
 {
     float f32;
     uint32_t u32;
-    uint8_t bytes[4];
+    uint8_t b[4];
 };
 
 union float64_u
 {
     double f64;
     uint64_t u64;
-    uint8_t bytes[8];
+    uint8_t b[8];
 };
 
 
@@ -122,6 +122,11 @@ union float64_u
     { \
         return KSBONJSON_ENCODE_NULL_POINTER; \
     }
+
+static const union uint16_u endiannessMarker = {.u16 = 0xff00};
+static inline bool isLittleEndian() {
+    return endiannessMarker.b[0] == 0;
+}
 
 static ksbonjson_encodeStatus addEncodedData(KSBONJSONEncodeContext* const context,
                                              const uint8_t* data,
@@ -197,12 +202,18 @@ static ksbonjson_encodeStatus encodeString(KSBONJSONEncodeContext* const context
 
 static ksbonjson_encodeStatus encodeInt16(KSBONJSONEncodeContext* const context, int16_t value)
 {
-    uint8_t data[3] =
+    union uint16_u u =
     {
-        TYPE_INT16,
-        (uint8_t)(value&0xff),
-        (uint8_t)((value>>8)&0xff),
+        .u16 = (uint16_t)value,
     };
+
+    likely_if(isLittleEndian())
+    {
+        uint8_t data[] = {TYPE_INT16, u.b[0], u.b[1]};
+        return addEncodedData(context, data, sizeof(data));
+    }
+
+    uint8_t data[] = {TYPE_INT16, u.b[1], u.b[0]};
     return addEncodedData(context, data, sizeof(data));
 }
 
@@ -236,14 +247,14 @@ static ksbonjson_encodeStatus encodeFloat32(KSBONJSONEncodeContext* const contex
     {
         .f32 = value,
     };
-    uint8_t data[] =
+
+    likely_if(isLittleEndian())
     {
-        TYPE_FLOAT32,
-        (uint8_t)(u.u32&0xff),
-        (uint8_t)((u.u32>>8)&0xff),
-        (uint8_t)((u.u32>>16)&0xff),
-        (uint8_t)((u.u32>>24)&0xff),
-    };
+        uint8_t data[] = {TYPE_FLOAT32, u.b[0], u.b[1], u.b[2], u.b[3]};
+        return addEncodedData(context, data, sizeof(data));
+    }
+
+    uint8_t data[] = {TYPE_FLOAT32, u.b[3], u.b[2], u.b[1], u.b[0]};
     return addEncodedData(context, data, sizeof(data));
 }
 
@@ -253,18 +264,14 @@ static ksbonjson_encodeStatus encodeFloat64(KSBONJSONEncodeContext* const contex
     {
         .f64 = value,
     };
-    uint8_t data[] =
+
+    likely_if(isLittleEndian())
     {
-        TYPE_FLOAT64,
-        (uint8_t)(u.u64&0xff),
-        (uint8_t)((u.u64>>8)&0xff),
-        (uint8_t)((u.u64>>16)&0xff),
-        (uint8_t)((u.u64>>24)&0xff),
-        (uint8_t)((u.u64>>32)&0xff),
-        (uint8_t)((u.u64>>40)&0xff),
-        (uint8_t)((u.u64>>48)&0xff),
-        (uint8_t)((u.u64>>56)&0xff),
-    };
+        uint8_t data[] = {TYPE_FLOAT64, u.b[0], u.b[1], u.b[2], u.b[3], u.b[4], u.b[5], u.b[6], u.b[7]};
+        return addEncodedData(context, data, sizeof(data));
+    }
+
+    uint8_t data[] = {TYPE_FLOAT64, u.b[7], u.b[6], u.b[5], u.b[4], u.b[3], u.b[2], u.b[1], u.b[0]};
     return addEncodedData(context, data, sizeof(data));
 }
 
