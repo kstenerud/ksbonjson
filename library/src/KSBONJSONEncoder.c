@@ -518,7 +518,6 @@ ksbonjson_encodeStatus ksbonjson_addBoolean(KSBONJSONEncodeContext* context, boo
     return encodeTypeCode(context, value ? TYPE_TRUE : TYPE_FALSE);
 }
 
-
 ksbonjson_encodeStatus ksbonjson_addFloat(KSBONJSONEncodeContext* context, double value)
 {
     KSBONJSONContainerState* state = &context->containers[context->containerDepth];
