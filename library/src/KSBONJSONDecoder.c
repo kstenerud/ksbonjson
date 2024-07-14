@@ -285,8 +285,9 @@ static ksbonjson_decodeStatus decodeAndReportLongString(DecodeContext* ctx)
         continuation = header & 1;
         length = header >> 1;
         SHOULD_HAVE_ROOM_FOR_BYTES(length);
+        str = (char*)ctx->bufferCurrent;
         ctx->bufferCurrent += length;
-        PROPAGATE_ERROR(ctx, callbacks->onStringChunk((char*)ctx->bufferCurrent,
+        PROPAGATE_ERROR(ctx, callbacks->onStringChunk(str,
                                                       length,
                                                       !continuation,
                                                       ctx->userData));

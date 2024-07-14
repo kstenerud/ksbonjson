@@ -52,6 +52,7 @@ class Event
 public:
     virtual ksbonjson_encodeStatus operator()(KSBONJSONEncodeContext* ctx) = 0;
     virtual std::string description() const = 0;
+    virtual std::string comparator() const = 0;
     virtual ~Event() {}
 protected:
     friend bool operator==(const Event&, const Event&);
@@ -59,10 +60,22 @@ protected:
 };
 
 bool operator==(const Event& lhs, const Event& rhs) {
-    return typeid(lhs) == typeid(rhs) && lhs.isEqual(rhs);
+    return lhs.comparator() == rhs.comparator();
+    //return typeid(lhs) == typeid(rhs) && lhs.isEqual(rhs);
+}
+bool operator!=(const Event& lhs, const Event& rhs) {
+    return !(lhs == rhs);
 }
 std::ostream &operator<<(std::ostream &os, Event const &e) { 
     return os << e.description();
+}
+std::ostream &operator<<(std::ostream &os, std::vector<std::shared_ptr<Event>> &v) { 
+    os << "[";
+    for(std::shared_ptr<Event> &e: v)
+    {
+        os << e->description() << " ";
+    }
+    return os << "]";
 }
 
 class BooleanEvent: public Event
@@ -76,10 +89,16 @@ public:
     {
         return ksbonjson_addBoolean(ctx, value);
     }
+    virtual std::string comparator() const override
+    {
+        std::ostringstream str;
+        str << (value ? "true" : "false");
+        return str.str();
+    }
     virtual std::string description() const override
     {
         std::ostringstream str;
-        str << "Boolean(" << (value ? "true" : "false") << ")";
+        str << "B(" << (value ? "true" : "false") << ")";
         return str.str();
     }
 private:
@@ -102,10 +121,16 @@ public:
     {
         return ksbonjson_addInteger(ctx, value);
     }
+    virtual std::string comparator() const override
+    {
+        std::ostringstream str;
+        str << value;
+        return str.str();
+    }
     virtual std::string description() const override
     {
         std::ostringstream str;
-        str << "Integer(" << value << ")";
+        str << "I(" << value << ")";
         return str.str();
     }
 private:
@@ -128,10 +153,16 @@ public:
     {
         return ksbonjson_addUInteger(ctx, value);
     }
+    virtual std::string comparator() const override
+    {
+        std::ostringstream str;
+        str << value;
+        return str.str();
+    }
     virtual std::string description() const override
     {
         std::ostringstream str;
-        str << "UInteger(" << value << ")";
+        str << "U(" << value << ")";
         return str.str();
     }
 private:
@@ -154,10 +185,16 @@ public:
     {
         return ksbonjson_addFloat(ctx, value);
     }
+    virtual std::string comparator() const override
+    {
+        std::ostringstream str;
+        str << value;
+        return str.str();
+    }
     virtual std::string description() const override
     {
         std::ostringstream str;
-        str << "Float(" << value << ")";
+        str << "F(" << value << ")";
         return str.str();
     }
 private:
@@ -177,9 +214,13 @@ public:
     {
         return ksbonjson_addNull(ctx);
     }
+    virtual std::string comparator() const override
+    {
+        return "null";
+    }
     virtual std::string description() const override
     {
-        return "Null()";
+        return "N()";
     }
 protected:
     virtual bool isEqual(const Event& obj) const override {
@@ -205,10 +246,16 @@ public:
     {
         return ksbonjson_addString(ctx, value.c_str(), value.length());
     }
+    virtual std::string comparator() const override
+    {
+        std::ostringstream str;
+        str << "\"" << value << "\"";
+        return str.str();
+    }
     virtual std::string description() const override
     {
         std::ostringstream str;
-        str << "String(" << value << ")";
+        str << "S(" << value << ")";
         return str.str();
     }
 private:
@@ -240,10 +287,16 @@ public:
     {
         return ksbonjson_chunkString(ctx, value.c_str(), value.length(), chunkMode == CHUNK_LAST);
     }
+    virtual std::string comparator() const override
+    {
+        std::ostringstream str;
+        str << "'" << value << "'";
+        return str.str();
+    }
     virtual std::string description() const override
     {
         std::ostringstream str;
-        str << "Chunk(" << value << ")";
+        str << "C(" << value << ")";
         return str.str();
     }
 private:
@@ -270,10 +323,16 @@ public:
     {
         return ksbonjson_addBONJSONDocument(ctx, value.data(), value.size());
     }
+    virtual std::string comparator() const override
+    {
+        std::ostringstream str;
+        str << "(" << value.size() << ")";
+        return str.str();
+    }
     virtual std::string description() const override
     {
         std::ostringstream str;
-        str << "BONJSON(" << value.size() << ")";
+        str << "BON(" << value.size() << ")";
         return str.str();
     }
 private:
@@ -293,9 +352,13 @@ public:
     {
         return ksbonjson_beginObject(ctx);
     }
+    virtual std::string comparator() const override
+    {
+        return "obj";
+    }
     virtual std::string description() const override
     {
-        return "Object()";
+        return "O()";
     }
 protected:
     virtual bool isEqual(const Event& obj) const override {
@@ -312,9 +375,13 @@ public:
     {
         return ksbonjson_beginArray(ctx);
     }
+    virtual std::string comparator() const override
+    {
+        return "arr";
+    }
     virtual std::string description() const override
     {
-        return "Array()";
+        return "A()";
     }
 protected:
     virtual bool isEqual(const Event& obj) const override {
@@ -331,32 +398,17 @@ public:
     {
         return ksbonjson_endContainer(ctx);
     }
+    virtual std::string comparator() const override
+    {
+        return "end";
+    }
     virtual std::string description() const override
     {
-        return "EndContainer()";
+        return "E()";
     }
 protected:
     virtual bool isEqual(const Event& obj) const override {
         auto v = static_cast<const ContainerEndEvent&>(obj);
-        return Event::isEqual(v);
-    }
-};
-
-class DataEndEvent: public Event
-{
-public:
-    virtual ~DataEndEvent() {}
-    virtual ksbonjson_encodeStatus operator()(KSBONJSONEncodeContext* ctx) override
-    {
-        return ksbonjson_endContainer(ctx);
-    }
-    virtual std::string description() const override
-    {
-        return "EndData()";
-    }
-protected:
-    virtual bool isEqual(const Event& obj) const override {
-        auto v = static_cast<const DataEndEvent&>(obj);
         return Event::isEqual(v);
     }
 };
@@ -460,8 +512,7 @@ static ksbonjson_decodeStatus onEndContainer(void* userData)
 
 static ksbonjson_decodeStatus onEndData(void* userData)
 {
-    DecoderContext* ctx = (DecoderContext*)userData;
-    ctx->addEvent(std::make_shared<DataEndEvent>());
+    MARK_UNUSED(userData);
     return KSBONJSON_DECODE_OK;
 }
 
@@ -556,6 +607,31 @@ ksbonjson_encodeStatus addEncodedDataFailCallback(const uint8_t* KSBONJSON_RESTR
 // Test Support
 // ============================================================================
 
+void assert_events_equal(std::vector<std::shared_ptr<Event>> expected, std::vector<std::shared_ptr<Event>> actual)
+{
+    bool isEqual = true;
+    if(expected.size() == actual.size())
+    {
+        for(size_t i = 0; i < expected.size(); i++)
+        {
+            if(*expected[i] != *actual[i])
+            {
+                isEqual = false;
+                break;
+            }
+        }
+    }
+    else
+    {
+        isEqual = false;
+    }
+    if(!isEqual)
+    {
+        std::cout << expected << " != " << actual << std::endl;
+        ADD_FAILURE();
+    }
+}
+
 void assert_encode_decode(std::vector<std::shared_ptr<Event>> events, std::vector<uint8_t> expected_encoded)
 {
     if(REPORT_ENCODING || REPORT_DECODING)
@@ -564,6 +640,10 @@ void assert_encode_decode(std::vector<std::shared_ptr<Event>> events, std::vecto
     }
 
     // Encode
+    if(REPORT_ENCODING)
+    {
+        printf("\n[assert_encode_decode]: Encode\n");
+    }
     KSBONJSONEncodeContext eContext;
     memset(&eContext, 0, sizeof(eContext));
     EncoderContext eCtx(10000);
@@ -577,23 +657,47 @@ void assert_encode_decode(std::vector<std::shared_ptr<Event>> events, std::vecto
     ASSERT_EQ(expected_encoded, actual_encoded);
 
     // Decode
+    if(REPORT_DECODING)
+    {
+        printf("\n[assert_encode_decode]: Decode\n");
+    }
     DecoderContext dCtx;
     size_t decodedOffset = 0;
     std::vector<uint8_t> document = actual_encoded;
     ASSERT_EQ(KSBONJSON_DECODE_OK, ksbonjson_decode(document.data(), document.size(), &dCtx.callbacks, &dCtx, &decodedOffset));
     ASSERT_EQ(expected_encoded.size(), decodedOffset);
+    assert_events_equal(events, dCtx.events);
 
     // Encode again
+    if(REPORT_ENCODING)
+    {
+        printf("\n[assert_encode_decode]: Encode again\n");
+    }
     eCtx.reset();
     memset(&eContext, 0, sizeof(eContext));
     ksbonjson_beginEncode(&eContext, addEncodedDataCallback, &eCtx);
-    for (const std::shared_ptr<Event>& event: events)
+    for (const std::shared_ptr<Event>& event: dCtx.events)
     {
         ASSERT_EQ(KSBONJSON_ENCODE_OK, (*event)(&eContext));
     }
     ASSERT_EQ(KSBONJSON_ENCODE_OK, ksbonjson_endEncode(&eContext));
     actual_encoded = eCtx.get();
     ASSERT_EQ(expected_encoded, actual_encoded);
+}
+
+void assert_decode(std::vector<uint8_t> document, std::vector<std::shared_ptr<Event>> expected_events)
+{
+    if(REPORT_ENCODING || REPORT_DECODING)
+    {
+        printf("\n[assert_decode]\n");
+    }
+
+    DecoderContext dCtx;
+    size_t decodedOffset = 0;
+    ASSERT_EQ(KSBONJSON_DECODE_OK, ksbonjson_decode(document.data(), document.size(), &dCtx.callbacks, &dCtx, &decodedOffset));
+    ASSERT_EQ(document.size(), decodedOffset);
+    printf("$$ %s vs %s: %d\n", expected_events[0]->description().c_str(), dCtx.events[0]->description().c_str(), expected_events[0] == dCtx.events[0]);
+    assert_events_equal(expected_events, dCtx.events);
 }
 
 void assert_encode_failure(std::vector<std::shared_ptr<Event>> events)
@@ -894,7 +998,6 @@ TEST(Encoder, object_name)
             std::make_shared<IntegerEvent>(1),
         std::make_shared<ContainerEndEvent>(),
     },
-
     {
         0x92,
             0x90, 0x03, 0x61, 0x05, 0x62, 0x63, 0x02, 0x64,
@@ -1640,10 +1743,36 @@ TEST(Encoder, containers)
     });
 }
 
-
-TEST(Decoder, bad_stuff)
+TEST(Decoder, unbalanced_containers)
 {
-    assert_decode_failure({0x92, 0x01, 0x01, 0x93});
+    assert_decode_failure({0x92});
+    assert_decode_failure({0x92, 0x92, 0x93});
+    assert_decode_failure({0x92, 0x91, 0x93});
+    assert_decode_failure({0x91});
+    assert_decode_failure({0x91, 0x91, 0x93});
+    assert_decode_failure({0x91, 0x92, 0x93});
+}
+
+TEST(Decoder, string_length_field)
+{
+    assert_decode_failure({0x71});
+    assert_decode_failure({0x72, 0x61});
+    assert_decode_failure({0x90, 0x02});
+    assert_decode_failure({0x90, 0x03, 0x61});
+    assert_decode_failure({0x90, 0x03, 0x61, 0x05, 0x66});
+}
+
+TEST(Decoder, big_number)
+{
+    assert_decode({0x6e, 0x01, 0x00}, {std::make_shared<UIntegerEvent>(0)});
+}
+
+TEST(Decoder, big_number_length_field)
+{
+    assert_decode_failure({0x6e});
+    assert_decode_failure({0x6e, 0x01});
+    assert_decode_failure({0x6e, 0x01});
+    // assert_decode_failure({0x6e, 0x01, 0x00});
 }
 
 
