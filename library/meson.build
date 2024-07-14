@@ -25,6 +25,7 @@ build_args = [
 # To test all compile-time code paths:
 #  '-DKSBONJSON_USE_MEMCPY=0',
 #  '-DKSBONJSON_IS_LITTLE_ENDIAN=0',
+#  '-DKSBONJSON_OPTIMIZE_SPACE=0',
 ]
 
 
@@ -96,6 +97,7 @@ if not meson.is_subproject()
     executable(
       'run_tests',
       files(project_test_files),
+      cpp_args : build_args,
       dependencies : [project_dep, test_dep],
       install : false,
       include_directories : private_headers,

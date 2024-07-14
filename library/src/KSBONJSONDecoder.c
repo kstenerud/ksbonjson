@@ -67,6 +67,18 @@ union uint16_u
     uint8_t b[2];
 };
 
+union uint32_u
+{
+    uint32_t u32;
+    uint8_t b[4];
+};
+
+union uint64_u
+{
+    uint64_t u64;
+    uint8_t b[8];
+};
+
 union float32_u
 {
     float f32;
@@ -213,7 +225,69 @@ static ksbonjson_decodeStatus decodeAndReportInt16(DecodeContext* ctx)
     union uint16_u u = {.b = {buf[1], buf[0]}};
     return ctx->callbacks->onInteger((int16_t)u.u16, ctx->userData);
 #endif
+}
 
+static ksbonjson_decodeStatus decodeAndReportInt32(DecodeContext* ctx)
+{
+    SHOULD_HAVE_ROOM_FOR_BYTES(4);
+    const uint8_t* buf = ctx->bufferCurrent;
+    ctx->bufferCurrent += 4;
+
+#if KSBONJSON_IS_LITTLE_ENDIAN
+#   if KSBONJSON_USE_MEMCPY
+        int32_t value;
+        memcpy(&value, buf, sizeof(value));
+        return ctx->callbacks->onInteger(value, ctx->userData);
+#   else
+        union uint32_u u = {.b = {buf[0], buf[1], buf[2], buf[3]}};
+        return ctx->callbacks->onInteger((int32_t)u.u32, ctx->userData);
+#   endif
+#else
+    union uint32_u u = {.b = {buf[3], buf[2], buf[1], buf[0]}};
+    return ctx->callbacks->onInteger((int32_t)u.u32, ctx->userData);
+#endif
+}
+
+static ksbonjson_decodeStatus decodeAndReportInt64(DecodeContext* ctx)
+{
+    SHOULD_HAVE_ROOM_FOR_BYTES(8);
+    const uint8_t* buf = ctx->bufferCurrent;
+    ctx->bufferCurrent += 8;
+
+#if KSBONJSON_IS_LITTLE_ENDIAN
+#   if KSBONJSON_USE_MEMCPY
+        int64_t value;
+        memcpy(&value, buf, sizeof(value));
+        return ctx->callbacks->onInteger(value, ctx->userData);
+#   else
+        union uint64_u u = {.b = {buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]}};
+        return ctx->callbacks->onInteger((int64_t)u.u64, ctx->userData);
+#   endif
+#else
+    union uint64_u u = {.b = {buf[7], buf[6], buf[5], buf[4], buf[3], buf[2], buf[1], buf[0]}};
+    return ctx->callbacks->onInteger((int64_t)u.u64, ctx->userData);
+#endif
+}
+
+static ksbonjson_decodeStatus decodeAndReportUInt64(DecodeContext* ctx)
+{
+    SHOULD_HAVE_ROOM_FOR_BYTES(8);
+    const uint8_t* buf = ctx->bufferCurrent;
+    ctx->bufferCurrent += 8;
+
+#if KSBONJSON_IS_LITTLE_ENDIAN
+#   if KSBONJSON_USE_MEMCPY
+        uint64_t value;
+        memcpy(&value, buf, sizeof(value));
+        return ctx->callbacks->onUInteger(value, ctx->userData);
+#   else
+        union uint64_u u = {.b = {buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]}};
+        return ctx->callbacks->onUInteger(u.u64, ctx->userData);
+#   endif
+#else
+    union uint64_u u = {.b = {buf[7], buf[6], buf[5], buf[4], buf[3], buf[2], buf[1], buf[0]}};
+    return ctx->callbacks->onUInteger(u.u64, ctx->userData);
+#endif
 }
 
 static ksbonjson_decodeStatus decodeAndReportFloat32(DecodeContext* ctx)
@@ -396,6 +470,18 @@ static ksbonjson_decodeStatus decode(DecodeContext* const ctx)
             case TYPE_INT16:
                 SHOULD_NOT_BE_EXPECTING_NAME();
                 PROPAGATE_ERROR(ctx, decodeAndReportInt16(ctx));
+                break;
+            case TYPE_INT32:
+                SHOULD_NOT_BE_EXPECTING_NAME();
+                PROPAGATE_ERROR(ctx, decodeAndReportInt32(ctx));
+                break;
+            case TYPE_INT64:
+                SHOULD_NOT_BE_EXPECTING_NAME();
+                PROPAGATE_ERROR(ctx, decodeAndReportInt64(ctx));
+                break;
+            case TYPE_UINT64:
+                SHOULD_NOT_BE_EXPECTING_NAME();
+                PROPAGATE_ERROR(ctx, decodeAndReportUInt64(ctx));
                 break;
             case TYPE_FLOAT32:
                 SHOULD_NOT_BE_EXPECTING_NAME();
