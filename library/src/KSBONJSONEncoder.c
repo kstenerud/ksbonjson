@@ -27,6 +27,10 @@
 #include <ksbonjson/KSBONJSONEncoder.h>
 #include <stddef.h>
 
+#if KSBONJSON_USE_MEMCPY
+#include <string.h>
+#endif
+
 
 // ============================================================================
 // Helpers
@@ -209,7 +213,13 @@ static ksbonjson_encodeStatus encodeInt16(KSBONJSONEncodeContext* const context,
 
     likely_if(isLittleEndian())
     {
+        #if KSBONJSON_USE_MEMCPY
+        uint8_t data[1+sizeof(u.b)];
+        data[0] = TYPE_INT16;
+        memcpy(data+1, u.b, sizeof(u.b));
+        #else
         uint8_t data[] = {TYPE_INT16, u.b[0], u.b[1]};
+        #endif
         return addEncodedData(context, data, sizeof(data));
     }
 
@@ -250,7 +260,13 @@ static ksbonjson_encodeStatus encodeFloat32(KSBONJSONEncodeContext* const contex
 
     likely_if(isLittleEndian())
     {
+        #if KSBONJSON_USE_MEMCPY
+        uint8_t data[1+sizeof(u.b)];
+        data[0] = TYPE_FLOAT32;
+        memcpy(data+1, u.b, sizeof(u.b));
+        #else
         uint8_t data[] = {TYPE_FLOAT32, u.b[0], u.b[1], u.b[2], u.b[3]};
+        #endif
         return addEncodedData(context, data, sizeof(data));
     }
 
@@ -267,7 +283,13 @@ static ksbonjson_encodeStatus encodeFloat64(KSBONJSONEncodeContext* const contex
 
     likely_if(isLittleEndian())
     {
+        #if KSBONJSON_USE_MEMCPY
+        uint8_t data[1+sizeof(u.b)];
+        data[0] = TYPE_FLOAT64;
+        memcpy(data+1, u.b, sizeof(u.b));
+        #else
         uint8_t data[] = {TYPE_FLOAT64, u.b[0], u.b[1], u.b[2], u.b[3], u.b[4], u.b[5], u.b[6], u.b[7]};
+        #endif
         return addEncodedData(context, data, sizeof(data));
     }
 

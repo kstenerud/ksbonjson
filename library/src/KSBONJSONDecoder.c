@@ -26,6 +26,10 @@
 
 #include <ksbonjson/KSBONJSONDecoder.h>
 
+#if KSBONJSON_USE_MEMCPY
+#include <string.h>
+#endif
+
 
 // ============================================================================
 // Helpers
@@ -200,7 +204,12 @@ static ksbonjson_decodeStatus decodeAndReportInt16(DecodeContext* ctx)
 
     likely_if(isLittleEndian())
     {
+        #if KSBONJSON_USE_MEMCPY
+        union uint16_u u;
+        memcpy(u.b, buf, sizeof(u.b));
+        #else
         union uint16_u u = {.b = {buf[0], buf[1]}};
+        #endif
         return ctx->callbacks->onInteger((int16_t)u.u16, ctx->userData);
     }
 
@@ -216,7 +225,12 @@ static ksbonjson_decodeStatus decodeAndReportFloat32(DecodeContext* ctx)
 
     likely_if(isLittleEndian())
     {
+        #if KSBONJSON_USE_MEMCPY
+        union float32_u u;
+        memcpy(u.b, buf, sizeof(u.b));
+        #else
         union float32_u u = {.b = {buf[0], buf[1], buf[2], buf[3]}};
+        #endif
         return ctx->callbacks->onFloat(u.f32, ctx->userData);
     }
 
@@ -232,7 +246,12 @@ static ksbonjson_decodeStatus decodeAndReportFloat64(DecodeContext* ctx)
 
     likely_if(isLittleEndian())
     {
+        #if KSBONJSON_USE_MEMCPY
+        union float64_u u;
+        memcpy(u.b, buf, sizeof(u.b));
+        #else
         union float64_u u = {.b = {buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]}};
+        #endif
         return ctx->callbacks->onFloat(u.f64, ctx->userData);
     }
 

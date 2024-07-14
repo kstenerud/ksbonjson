@@ -40,6 +40,10 @@
     #define KSBONJSON_MAX_CONTAINER_DEPTH 200
 #endif
 
+#ifndef KSBONJSON_USE_MEMCPY
+    #define KSBONJSON_USE_MEMCPY 1
+#endif
+
 #ifndef KSBONJSON_RESTRICT
     #ifdef __cplusplus
         #define KSBONJSON_RESTRICT __restrict__
