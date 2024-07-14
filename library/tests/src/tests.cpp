@@ -758,27 +758,6 @@ TEST(EncodeDecode, boolean)
     assert_encode_decode({std::make_shared<BooleanEvent>(false)}, {0x94});
 }
 
-TEST(EncodeDecode, smallint)
-{
-    assert_encode_decode({std::make_shared<IntegerEvent>(0)}, {0x00});
-    assert_encode_decode({std::make_shared<IntegerEvent>(1)}, {0x01});
-    assert_encode_decode({std::make_shared<IntegerEvent>(-1)}, {0xff});
-    assert_encode_decode({std::make_shared<IntegerEvent>(10)}, {0x0a});
-    assert_encode_decode({std::make_shared<IntegerEvent>(-60)}, {0xc4});
-    assert_encode_decode({std::make_shared<IntegerEvent>(104)}, {0x68});
-    assert_encode_decode({std::make_shared<IntegerEvent>(-104)}, {0x98});
-}
-
-TEST(EncodeDecode, int16)
-{
-    assert_encode_decode({std::make_shared<IntegerEvent>(106)}, {0x6a, 0x6a, 0x00});
-    assert_encode_decode({std::make_shared<IntegerEvent>(-107)}, {0x6a, 0x95, 0xff});
-    assert_encode_decode({std::make_shared<IntegerEvent>(1000)}, {0x6a, 0xe8, 0x03});
-    assert_encode_decode({std::make_shared<IntegerEvent>(-1000)}, {0x6a, 0x18, 0xfc});
-    assert_encode_decode({std::make_shared<IntegerEvent>(0x7fff)}, {0x6a, 0xff, 0x7f});
-    assert_encode_decode({std::make_shared<IntegerEvent>(-0x8000)}, {0x6a, 0x00, 0x80});
-}
-
 TEST(EncodeDecode, float32)
 {
     assert_encode_decode({std::make_shared<FloatEvent>(1.125)}, {0x6e, 0x00, 0x00, 0x90, 0x3f});
@@ -789,12 +768,42 @@ TEST(EncodeDecode, float64)
     assert_encode_decode({std::make_shared<FloatEvent>(1.234)}, {0x6f, 0x58, 0x39, 0xb4, 0xc8, 0x76, 0xbe, 0xf3, 0x3f});
 }
 
+TEST(EncodeDecode, smallint)
+{
+    assert_encode_decode({std::make_shared<IntegerEvent>(0LL)}, {0x00});
+    assert_encode_decode({std::make_shared<IntegerEvent>(1LL)}, {0x01});
+    assert_encode_decode({std::make_shared<IntegerEvent>(-1LL)}, {0xff});
+    assert_encode_decode({std::make_shared<IntegerEvent>(10LL)}, {0x0a});
+    assert_encode_decode({std::make_shared<IntegerEvent>(-60LL)}, {0xc4});
+    assert_encode_decode({std::make_shared<IntegerEvent>(104LL)}, {0x68});
+    assert_encode_decode({std::make_shared<IntegerEvent>(-104LL)}, {0x98});
+}
+
+TEST(EncodeDecode, int16)
+{
+    assert_encode_decode({std::make_shared<IntegerEvent>(105LL)}, {0x6a, 0x69, 0x00});
+    assert_encode_decode({std::make_shared<IntegerEvent>(-105LL)}, {0x6a, 0x97, 0xff});
+    assert_encode_decode({std::make_shared<IntegerEvent>(1000LL)}, {0x6a, 0xe8, 0x03});
+    assert_encode_decode({std::make_shared<IntegerEvent>(-1000LL)}, {0x6a, 0x18, 0xfc});
+    assert_encode_decode({std::make_shared<IntegerEvent>(0x7fffLL)}, {0x6a, 0xff, 0x7f});
+    assert_encode_decode({std::make_shared<IntegerEvent>(-0x8000LL)}, {0x6a, 0x00, 0x80});
+}
+
+TEST(EncodeDecode, int32)
+{
+    assert_encode_decode({std::make_shared<IntegerEvent>(0x8000LL)}, {0x6b, 0x00, 0x80, 0x00, 0x00});
+    assert_encode_decode({std::make_shared<IntegerEvent>(-0x8001LL)}, {0x6b, 0xff, 0x7f, 0xff, 0xff});
+    assert_encode_decode({std::make_shared<IntegerEvent>(0x7fffffffLL)}, {0x6b, 0xff, 0xff, 0xff, 0x7f});
+    assert_encode_decode({std::make_shared<IntegerEvent>(-0x80000000LL)}, {0x6b, 0x00, 0x00, 0x00, 0x80});
+}
+
 #if KSBONJSON_OPTIMIZE_SPACE
 TEST(EncodeDecode, bigint)
 {
     assert_encode_decode({std::make_shared<IntegerEvent>(-0x80000001LL)}, {0x97, 0x10, 0x01, 0x00, 0x00, 0x80});
     assert_encode_decode({std::make_shared<IntegerEvent>(-0xffffffffLL)}, {0x97, 0x10, 0xff, 0xff, 0xff, 0xff});
 
+    assert_encode_decode({std::make_shared<IntegerEvent>(0x80000000LL)}, {0x96, 0x10, 0x00, 0x00, 0x00, 0x80});
     assert_encode_decode({std::make_shared<IntegerEvent>(0x100000000LL)}, {0x96, 0x14, 0x00, 0x00, 0x00, 0x00, 0x01});
     assert_encode_decode({std::make_shared<IntegerEvent>(0x8000000000LL)}, {0x96, 0x14, 0x00, 0x00, 0x00, 0x00, 0x80});
     assert_encode_decode({std::make_shared<IntegerEvent>(0xffffffffffLL)}, {0x96, 0x14, 0xff, 0xff, 0xff, 0xff, 0xff});
@@ -867,7 +876,7 @@ TEST(EncodeDecode, array)
     assert_encode_decode(
     {
         std::make_shared<ArrayBeginEvent>(),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
             std::make_shared<StringEvent>("x"),
             std::make_shared<NullEvent>(),
         std::make_shared<ContainerEndEvent>(),
@@ -887,7 +896,7 @@ TEST(EncodeDecode, object)
     assert_encode_decode(
     {
         std::make_shared<ObjectBeginEvent>(),
-            std::make_shared<StringEvent>("1"), std::make_shared<IntegerEvent>(1),
+            std::make_shared<StringEvent>("1"), std::make_shared<IntegerEvent>(1LL),
             std::make_shared<StringEvent>("2"), std::make_shared<StringEvent>("x"),
             std::make_shared<StringEvent>("3"), std::make_shared<NullEvent>(),
         std::make_shared<ContainerEndEvent>(),
@@ -922,7 +931,7 @@ TEST(Encoder, object_name)
     {
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<StringEvent>("a"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -938,7 +947,7 @@ TEST(Encoder, object_name)
             std::make_shared<StringChunkEvent>("a", CHUNK_HAS_NEXT),
             std::make_shared<StringChunkEvent>("bc", CHUNK_HAS_NEXT),
             std::make_shared<StringChunkEvent>("d", CHUNK_LAST),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -953,16 +962,16 @@ TEST(Encoder, object_name)
     assert_encode_failure(
     {
         std::make_shared<ObjectBeginEvent>(),
-            std::make_shared<IntegerEvent>(1),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     });
 
     assert_encode_failure(
     {
         std::make_shared<ObjectBeginEvent>(),
-            std::make_shared<IntegerEvent>(1000),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1000LL),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     });
 
@@ -978,7 +987,7 @@ TEST(Encoder, object_name)
     {
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<BooleanEvent>(true),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     });
 
@@ -986,7 +995,7 @@ TEST(Encoder, object_name)
     {
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<FloatEvent>(1.234),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     });
 
@@ -994,7 +1003,7 @@ TEST(Encoder, object_name)
     {
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<NullEvent>(),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     });
 
@@ -1003,7 +1012,7 @@ TEST(Encoder, object_name)
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<ObjectBeginEvent>(),
             std::make_shared<ContainerEndEvent>(),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     });
 
@@ -1012,7 +1021,7 @@ TEST(Encoder, object_name)
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<ArrayBeginEvent>(),
             std::make_shared<ContainerEndEvent>(),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     });
 }
@@ -1030,7 +1039,7 @@ TEST(Encoder, object_value)
     {
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<StringEvent>("a"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
             std::make_shared<StringEvent>("z"),
         std::make_shared<ContainerEndEvent>(),
     });
@@ -1039,9 +1048,9 @@ TEST(Encoder, object_value)
     {
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<StringEvent>("a"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
             std::make_shared<StringEvent>("z"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -1057,9 +1066,9 @@ TEST(Encoder, object_value)
     {
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<StringEvent>("a"),
-            std::make_shared<IntegerEvent>(-1),
+            std::make_shared<IntegerEvent>(-1LL),
             std::make_shared<StringEvent>("z"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -1075,9 +1084,9 @@ TEST(Encoder, object_value)
     {
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<StringEvent>("a"),
-            std::make_shared<IntegerEvent>(1000),
+            std::make_shared<IntegerEvent>(1000LL),
             std::make_shared<StringEvent>("z"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -1095,7 +1104,7 @@ TEST(Encoder, object_value)
             std::make_shared<StringEvent>("a"),
             std::make_shared<IntegerEvent>(0x1000000000000000LL),
             std::make_shared<StringEvent>("z"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -1113,7 +1122,7 @@ TEST(Encoder, object_value)
             std::make_shared<StringEvent>("a"),
             std::make_shared<IntegerEvent>(-0x1000000000000000LL),
             std::make_shared<StringEvent>("z"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -1131,7 +1140,7 @@ TEST(Encoder, object_value)
             std::make_shared<StringEvent>("a"),
             std::make_shared<FloatEvent>(1.25),
             std::make_shared<StringEvent>("z"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -1149,7 +1158,7 @@ TEST(Encoder, object_value)
             std::make_shared<StringEvent>("a"),
             std::make_shared<FloatEvent>(-5.923441e-50),
             std::make_shared<StringEvent>("z"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -1167,7 +1176,7 @@ TEST(Encoder, object_value)
             std::make_shared<StringEvent>("a"),
             std::make_shared<StringEvent>("b"),
             std::make_shared<StringEvent>("z"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -1188,7 +1197,7 @@ TEST(Encoder, object_value)
             std::make_shared<StringChunkEvent>("d", CHUNK_HAS_NEXT),
             std::make_shared<StringChunkEvent>("e", CHUNK_LAST),
             std::make_shared<StringEvent>("z"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -1206,7 +1215,7 @@ TEST(Encoder, object_value)
             std::make_shared<StringEvent>("a"),
             std::make_shared<BooleanEvent>(false),
             std::make_shared<StringEvent>("z"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -1224,7 +1233,7 @@ TEST(Encoder, object_value)
             std::make_shared<StringEvent>("a"),
             std::make_shared<NullEvent>(),
             std::make_shared<StringEvent>("z"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -1243,7 +1252,7 @@ TEST(Encoder, object_value)
             std::make_shared<ObjectBeginEvent>(),
             std::make_shared<ContainerEndEvent>(),
             std::make_shared<StringEvent>("z"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -1263,7 +1272,7 @@ TEST(Encoder, object_value)
             std::make_shared<ArrayBeginEvent>(),
             std::make_shared<ContainerEndEvent>(),
             std::make_shared<StringEvent>("z"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -1294,9 +1303,9 @@ TEST(Encoder, array_value)
     {
         std::make_shared<ArrayBeginEvent>(),
             std::make_shared<StringEvent>("a"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
             std::make_shared<StringEvent>("z"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -1312,9 +1321,9 @@ TEST(Encoder, array_value)
     {
         std::make_shared<ArrayBeginEvent>(),
             std::make_shared<StringEvent>("a"),
-            std::make_shared<IntegerEvent>(-1),
+            std::make_shared<IntegerEvent>(-1LL),
             std::make_shared<StringEvent>("z"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -1330,9 +1339,9 @@ TEST(Encoder, array_value)
     {
         std::make_shared<ArrayBeginEvent>(),
             std::make_shared<StringEvent>("a"),
-            std::make_shared<IntegerEvent>(1000),
+            std::make_shared<IntegerEvent>(1000LL),
             std::make_shared<StringEvent>("z"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -1350,7 +1359,7 @@ TEST(Encoder, array_value)
             std::make_shared<StringEvent>("a"),
             std::make_shared<IntegerEvent>(0x1000000000000000LL),
             std::make_shared<StringEvent>("z"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -1368,7 +1377,7 @@ TEST(Encoder, array_value)
             std::make_shared<StringEvent>("a"),
             std::make_shared<IntegerEvent>(-0x1000000000000000LL),
             std::make_shared<StringEvent>("z"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -1386,7 +1395,7 @@ TEST(Encoder, array_value)
             std::make_shared<StringEvent>("a"),
             std::make_shared<FloatEvent>(1.25),
             std::make_shared<StringEvent>("z"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -1404,7 +1413,7 @@ TEST(Encoder, array_value)
             std::make_shared<StringEvent>("a"),
             std::make_shared<FloatEvent>(-5.923441e-50),
             std::make_shared<StringEvent>("z"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -1422,7 +1431,7 @@ TEST(Encoder, array_value)
             std::make_shared<StringEvent>("a"),
             std::make_shared<StringEvent>("b"),
             std::make_shared<StringEvent>("z"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -1443,7 +1452,7 @@ TEST(Encoder, array_value)
             std::make_shared<StringChunkEvent>("d", CHUNK_HAS_NEXT),
             std::make_shared<StringChunkEvent>("e", CHUNK_LAST),
             std::make_shared<StringEvent>("z"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -1461,7 +1470,7 @@ TEST(Encoder, array_value)
             std::make_shared<StringEvent>("a"),
             std::make_shared<BooleanEvent>(false),
             std::make_shared<StringEvent>("z"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -1479,7 +1488,7 @@ TEST(Encoder, array_value)
             std::make_shared<StringEvent>("a"),
             std::make_shared<NullEvent>(),
             std::make_shared<StringEvent>("z"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -1498,7 +1507,7 @@ TEST(Encoder, array_value)
             std::make_shared<ObjectBeginEvent>(),
             std::make_shared<ContainerEndEvent>(),
             std::make_shared<StringEvent>("z"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -1518,7 +1527,7 @@ TEST(Encoder, array_value)
             std::make_shared<ArrayBeginEvent>(),
             std::make_shared<ContainerEndEvent>(),
             std::make_shared<StringEvent>("z"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     },
     {
@@ -1543,7 +1552,7 @@ TEST(Encoder, failed_to_add)
     memset(&eContext, 0, sizeof(eContext));
     EncoderContext eCtx(10000);
     ksbonjson_beginEncode(&eContext, addEncodedDataFailCallback, &eCtx);
-    ASSERT_NE(KSBONJSON_ENCODE_OK, (*std::make_shared<IntegerEvent>(1))(&eContext));
+    ASSERT_NE(KSBONJSON_ENCODE_OK, (*std::make_shared<IntegerEvent>(1LL))(&eContext));
 }
 
 TEST(Encoder, string_chunking)
@@ -1566,7 +1575,7 @@ TEST(Encoder, string_chunking)
     {
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<StringChunkEvent>("a", CHUNK_HAS_NEXT),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
         std::make_shared<ContainerEndEvent>(),
     });
 
@@ -1707,7 +1716,7 @@ TEST(Decoder, string_length_field)
 
 TEST(Decoder, big_number)
 {
-    assert_decode({0x96, 0x01, 0x00}, {std::make_shared<UIntegerEvent>(0)});
+    assert_decode({0x96, 0x01, 0x00}, {std::make_shared<UIntegerEvent>(0LL)});
 }
 
 TEST(Decoder, big_number_length_field)
@@ -1729,11 +1738,11 @@ TEST(Example, specification)
     {
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<StringEvent>("a number"),
-            std::make_shared<IntegerEvent>(1),
+            std::make_shared<IntegerEvent>(1LL),
             std::make_shared<StringEvent>("an array"),
             std::make_shared<ArrayBeginEvent>(),
                 std::make_shared<StringEvent>("x"),
-                std::make_shared<IntegerEvent>(1000),
+                std::make_shared<IntegerEvent>(1000LL),
                 std::make_shared<FloatEvent>(1.5),
             std::make_shared<ContainerEndEvent>(),
             std::make_shared<StringEvent>("a null"),
@@ -1743,7 +1752,7 @@ TEST(Example, specification)
             std::make_shared<StringEvent>("an object"),
             std::make_shared<ObjectBeginEvent>(),
                 std::make_shared<StringEvent>("a"),
-                std::make_shared<IntegerEvent>(-100),
+                std::make_shared<IntegerEvent>(-100LL),
                 std::make_shared<StringEvent>("b"),
                 std::make_shared<StringEvent>("........................................"),
             std::make_shared<ContainerEndEvent>(),

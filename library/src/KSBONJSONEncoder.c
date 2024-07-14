@@ -369,30 +369,30 @@ static ksbonjson_encodeStatus encodeBigInt(KSBONJSONEncodeContext* const context
 #define MASK_OUT_LOWER_48_BITS 0xffff000000000000
 #define MASK_OUT_LOWER_47_BITS 0xffff800000000000
 
-#define TRY_ENCODE_BIGINT(BITS, VALUE) \
+#define TRY_ENCODE_BIGINT(BITS, FROM_VALUE) \
     do \
     { \
-        if((value&(int64_t)MASK_OUT_LOWER_ ## BITS ## _BITS) == (int64_t)MASK_OUT_LOWER_ ## BITS ## _BITS || \
-        (value&MASK_OUT_LOWER_ ## BITS ## _BITS) == 0) \
+        if(((FROM_VALUE)&(int64_t)MASK_OUT_LOWER_ ## BITS ## _BITS) == (int64_t)MASK_OUT_LOWER_ ## BITS ## _BITS || \
+        ((FROM_VALUE)&MASK_OUT_LOWER_ ## BITS ## _BITS) == 0) \
         { \
             uint8_t typeCode = TYPE_BIGPOSITIVE; \
-            uint64_t u64Val = (uint64_t)value; \
-            if(value < 0) \
+            uint64_t toValue = (uint64_t)(FROM_VALUE); \
+            if((FROM_VALUE) < 0) \
             { \
                 typeCode = TYPE_BIGNEGATIVE; \
-                u64Val = (uint64_t)(-value); \
+                toValue = (uint64_t)(-(FROM_VALUE)); \
             } \
-            return encodeBigInt(context, typeCode, u64Val); \
+            return encodeBigInt(context, typeCode, toValue); \
         } \
     } \
     while(0)
 
-#define TRY_ENCODE_BIGINT_UNSIGNED(BITS, VALUE) \
+#define TRY_ENCODE_BIGINT_UNSIGNED(BITS, FROM_VALUE) \
     do \
     { \
-        if((value&MASK_OUT_LOWER_ ## BITS ## _BITS) == 0) \
+        if(((FROM_VALUE)&MASK_OUT_LOWER_ ## BITS ## _BITS) == 0) \
         { \
-            return encodeBigInt(context, TYPE_BIGPOSITIVE, value); \
+            return encodeBigInt(context, TYPE_BIGPOSITIVE, FROM_VALUE); \
         } \
     } \
     while(0)
@@ -401,71 +401,73 @@ static ksbonjson_encodeStatus encodeBigInt(KSBONJSONEncodeContext* const context
 #define TRY_ENCODE_BIGINT_UNSIGNED(BITS, VALUE)
 #endif
 
-#define TRY_ENCODE_SMALLINT(VALUE, FROM_TYPE) \
+#define TRY_ENCODE_SMALLINT(FROM_VALUE, FROM_TYPE) \
     do \
     { \
-        int8_t i8Val = (int8_t)(VALUE); \
-        if((FROM_TYPE)i8Val == (VALUE)) \
+        int8_t toValue = (int8_t)(FROM_VALUE); \
+        if((FROM_TYPE)toValue == (FROM_VALUE)) \
         { \
-            likely_if((i8Val >= 0 && i8Val <= SMALLINT_MAX) || (i8Val >= SMALLINT_MIN && i8Val <= -1)) \
+            likely_if((toValue >= 0 && toValue <= SMALLINT_MAX) || \
+                      (toValue >= SMALLINT_MIN && toValue <= -1)) \
             { \
-                return encodeTypeCode(context, (uint8_t)i8Val); \
+                return encodeTypeCode(context, (uint8_t)toValue); \
             } \
             else \
             { \
-                return encodeInt16(context, i8Val); \
+                return encodeInt16(context, toValue); \
             } \
         } \
     } \
     while(0)
 
-#define TRY_ENCODE_SMALLINT_UNSIGNED(VALUE, FROM_TYPE) \
+#define TRY_ENCODE_SMALLINT_UNSIGNED(FROM_VALUE, FROM_TYPE) \
     do \
     { \
-        int8_t i8Val = (int8_t)(VALUE); \
-        if(i8Val >= 0 && (FROM_TYPE)i8Val == (VALUE)) \
+        int8_t toValue = (int8_t)(FROM_VALUE); \
+        if(toValue >= 0 && (FROM_TYPE)toValue == (FROM_VALUE)) \
         { \
-            likely_if((i8Val >= 0 && i8Val <= SMALLINT_MAX) || (i8Val >= SMALLINT_MIN && i8Val <= -1)) \
+            likely_if((toValue >= 0 && toValue <= SMALLINT_MAX) || \
+                      (toValue >= SMALLINT_MIN && toValue <= -1)) \
             { \
-                return encodeTypeCode(context, (uint8_t)i8Val); \
+                return encodeTypeCode(context, (uint8_t)toValue); \
             } \
             else \
             { \
-                return encodeInt16(context, i8Val); \
+                return encodeInt16(context, toValue); \
             } \
         } \
     } \
     while(0)
 
-#define TRY_ENCODE_INT(SIZE, VALUE, FROM_TYPE) \
+#define TRY_ENCODE_INT(TO_SIZE, FROM_VALUE, FROM_TYPE) \
     do \
     { \
-        int ## SIZE ## _t localVal = (int ## SIZE ## _t)(VALUE); \
-        if((FROM_TYPE)localVal == (VALUE)) \
+        int ## TO_SIZE ## _t toValue = (int ## TO_SIZE ## _t)(FROM_VALUE); \
+        if((FROM_TYPE)toValue == (FROM_VALUE)) \
         { \
-            return encodeInt ## SIZE (context, localVal); \
+            return encodeInt ## TO_SIZE (context, toValue); \
         } \
     } \
     while(0)
 
-#define TRY_ENCODE_INT_UNSIGNED(SIZE, VALUE, FROM_TYPE) \
+#define TRY_ENCODE_INT_UNSIGNED(SIZE, FROM_VALUE, FROM_TYPE) \
     do \
     { \
-        int ## SIZE ## _t localVal = (int ## SIZE ## _t)(VALUE); \
-        if(localVal >= 0 && (FROM_TYPE)localVal == (VALUE)) \
+        int ## SIZE ## _t toValue = (int ## SIZE ## _t)(FROM_VALUE); \
+        if(toValue >= 0 && (FROM_TYPE)toValue == (FROM_VALUE)) \
         { \
-            return encodeInt ## SIZE (context, localVal); \
+            return encodeInt ## SIZE (context, toValue); \
         } \
     } \
     while(0)
 
-#define TRY_ENCODE_F32(VALUE, FROM_TYPE) \
+#define TRY_ENCODE_F32(FROM_VALUE, FROM_TYPE) \
     do \
     { \
-        float f32Val = (float)(VALUE); \
-        if((FROM_TYPE)f32Val == (VALUE)) \
+        float toValue = (float)(FROM_VALUE); \
+        if((FROM_TYPE)toValue == (FROM_VALUE)) \
         { \
-            return encodeFloat32(context, f32Val); \
+            return encodeFloat32(context, toValue); \
         } \
     } \
     while(0)
@@ -544,8 +546,8 @@ ksbonjson_encodeStatus ksbonjson_addInteger(KSBONJSONEncodeContext* context, int
     TRY_ENCODE_SMALLINT(value, int64_t); // 1 byte
     TRY_ENCODE_INT(16, value, int64_t);  // 3 bytes
     TRY_ENCODE_INT(32, value, int64_t);  // 5 bytes
-    TRY_ENCODE_BIGINT(39, value);        // 7 bytes
-    TRY_ENCODE_BIGINT(47, value);        // 8 bytes
+    TRY_ENCODE_BIGINT(39, value);        // 7 bytes (if enabled)
+    TRY_ENCODE_BIGINT(47, value);        // 8 bytes (if enabled)
     return encodeInt64(context, value);  // 9 bytes
 }
 
@@ -559,8 +561,8 @@ ksbonjson_encodeStatus ksbonjson_addUInteger(KSBONJSONEncodeContext* context, ui
     TRY_ENCODE_SMALLINT_UNSIGNED(value, uint64_t); // 1 byte
     TRY_ENCODE_INT_UNSIGNED(16, value, uint64_t);  // 3 bytes
     TRY_ENCODE_INT_UNSIGNED(32, value, uint64_t);  // 5 bytes
-    TRY_ENCODE_BIGINT_UNSIGNED(40, value);         // 7 bytes
-    TRY_ENCODE_BIGINT_UNSIGNED(48, value);         // 8 bytes
+    TRY_ENCODE_BIGINT_UNSIGNED(40, value);         // 7 bytes (if enabled)
+    TRY_ENCODE_BIGINT_UNSIGNED(48, value);         // 8 bytes (if enabled)
     return encodeUInt64(context, value);           // 9 bytes
 }
 
