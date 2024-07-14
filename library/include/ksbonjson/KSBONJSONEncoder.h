@@ -63,7 +63,7 @@
 #endif
 
 /**
- * Restrict, if available, increases optimization opportunities.
+ * The restrict modifier, if available, increases optimization opportunities.
  */
 #ifndef KSBONJSON_RESTRICT
 #   ifdef __cplusplus
