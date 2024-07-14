@@ -175,7 +175,7 @@ static ksbonjson_encodeStatus encodeULEB128(KSBONJSONEncodeContext* const contex
     {
         uint8_t encoded = (uint8_t)(value&0x7f);
         value >>= 7;
-        if(value != 0)
+        unlikely_if(value != 0) // Multibyte uleb128 is uncommon
         {
             encoded |= 0x80;
         }
@@ -190,7 +190,7 @@ static ksbonjson_encodeStatus encodeStringChunkHeader(KSBONJSONEncodeContext* co
                                                       bool isLastChunk)
 {
     uint64_t value = length << 1;
-    if(!isLastChunk)
+    unlikely_if(!isLastChunk) // The most common pattern is single chunk
     {
         value |= 1;
     }
@@ -592,12 +592,12 @@ ksbonjson_encodeStatus ksbonjson_chunkString(KSBONJSONEncodeContext* context,
     KSBONJSONContainerState* state = &context->containers[context->containerDepth];
     SHOULD_NOT_BE_NULL(chunk);
 
-    if(!state->isChunkingString)
+    unlikely_if(!state->isChunkingString)
     {
         PROPAGATE_ERROR(encodeTypeCode(context, TYPE_STRINGLONG));
     }
     state->isChunkingString = !isLastChunk;
-    if(isLastChunk)
+    unlikely_if(isLastChunk) // If we're chunking, this is less likely
     {
         state->isExpectingName = !state->isExpectingName;
     }
