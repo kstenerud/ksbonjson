@@ -41,11 +41,12 @@
 #define unlikely_if(x) if(__builtin_expect(x,0))
 
 enum {
-    TYPE_NULL = 0x69,
-    TYPE_INT16 = 0x6a,
-    TYPE_INT32 = 0x6b,
-    TYPE_INT64 = 0x6c,
-    TYPE_UINT64 = 0x6d,
+    TYPE_NULL = 0x68,
+    TYPE_INT16 = 0x69,
+    TYPE_INT32 = 0x6a,
+    TYPE_INT64 = 0x6b,
+    TYPE_UINT64 = 0x6c,
+    TYPE_FLOAT16 = 0x6d,
     TYPE_FLOAT32 = 0x6e,
     TYPE_FLOAT64 = 0x6f,
     TYPE_STRINGSHORT = 0x70,
@@ -59,7 +60,7 @@ enum {
     TYPE_BIGNEGATIVE = 0x97,
 };
 
-#define SMALLINT_MAX 104
+#define SMALLINT_MAX 103
 #define SMALLINT_MIN -104
 
 union uint16_u
@@ -461,6 +462,36 @@ static ksbonjson_encodeStatus encodeBigInt(KSBONJSONEncodeContext* const context
     } \
     while(0)
 
+#if KSBONJSON_IS_LITTLE_ENDIAN
+#define TRY_ENCODE_F16(FROM_VALUE, FROM_TYPE) \
+    do \
+    { \
+        union float32_u u = {.f32 = (float)(FROM_VALUE)}; \
+        u.b[0] = 0; \
+        u.b[1] = 0; \
+        if((FROM_TYPE)u.f32 == (FROM_VALUE)) \
+        { \
+            u.b[1] = TYPE_FLOAT16; \
+            return addEncodedData(context, &u.b[1], 3); \
+        } \
+    } \
+    while(0)
+#else
+#define TRY_ENCODE_F16(FROM_VALUE, FROM_TYPE) \
+    do \
+    { \
+        union float32_u u = {.f32 = (float)(FROM_VALUE)}; \
+        u.b[3] = 0; \
+        u.b[4] = 0; \
+        if((FROM_TYPE)u.f32 == (FROM_VALUE)) \
+        { \
+            uint8_t data[] = {TYPE_FLOAT16, u.b[1], u.b[0]}; \
+            return addEncodedData(context, data, sizeof(data)); \
+        } \
+    } \
+    while(0)
+#endif
+
 #define TRY_ENCODE_F32(FROM_VALUE, FROM_TYPE) \
     do \
     { \
@@ -525,6 +556,7 @@ ksbonjson_encodeStatus ksbonjson_addFloat(KSBONJSONEncodeContext* context, doubl
     SHOULD_NOT_BE_CHUNKING_STRING();
 
     state->isExpectingName = true;
+    TRY_ENCODE_F16(value, double);     // 3 bytes
     TRY_ENCODE_INT(16, value, double); // 3 bytes
     TRY_ENCODE_INT(32, value, double); // 5 bytes
     TRY_ENCODE_F32(value, double);     // 5 bytes

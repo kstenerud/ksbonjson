@@ -37,7 +37,7 @@
 
 // Max size of file this program will read before balking.
 // Note: The entire file gets loaded into memory, so choose wisely.
-#define MAX_FILE_SIZE 1000000000
+#define MAX_FILE_SIZE 5000000000
 
 
 // ============================================================================
@@ -136,13 +136,12 @@ static uint8_t* readEntireFile(FILE* const file, size_t* const fileLength)
         {
             printPError_exit("Could not read %d bytes from file", length);
         }
-        bool isEof = feof(file);
         bufferOffset += bytes_read;
-        if(isEof)
+        if(feof(file))
         {
             break;
         }
-        if(bufferOffset > (bufferSize/2)*3)
+        if(bufferOffset > (bufferSize/3)*2)
         {
             if(bufferOffset >= MAX_FILE_SIZE)
             {
@@ -328,10 +327,10 @@ static ksbonjson_encodeStatus jsonToBonjson(const char* src_path, const char* ds
     json_tokener_free(tokener);
     if(root == NULL)
     {
-        printError_exit("Failed to open %s", src_path);
+        printError_exit("Failed to parse JSON");
     }
 
-    bonjson_encode_context* ctx = new_bonjson_encode_context(documentSize);
+    bonjson_encode_context* ctx = new_bonjson_encode_context(documentSize*2);
     KSBONJSONEncodeContext eContext = {0};
     ksbonjson_beginEncode(&eContext, addEncodedDataCallback, ctx);
     ksbonjson_encodeStatus status = parseJsonElement(root, &eContext);
@@ -343,7 +342,7 @@ static ksbonjson_encodeStatus jsonToBonjson(const char* src_path, const char* ds
     }
 
     file = openFileForWriting(dst_path);
-     writeToFile(file, ctx->buffer, ctx->pos);
+    writeToFile(file, ctx->buffer, ctx->pos);
     closeFile(file);
     free_bonjson_encode_context(ctx);
 

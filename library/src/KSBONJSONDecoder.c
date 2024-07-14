@@ -40,11 +40,12 @@
 #define unlikely_if(x) if(__builtin_expect(x,0))
 
 enum {
-    TYPE_NULL = 0x69,
-    TYPE_INT16 = 0x6a,
-    TYPE_INT32 = 0x6b,
-    TYPE_INT64 = 0x6c,
-    TYPE_UINT64 = 0x6d,
+    TYPE_NULL = 0x68,
+    TYPE_INT16 = 0x69,
+    TYPE_INT32 = 0x6a,
+    TYPE_INT64 = 0x6b,
+    TYPE_UINT64 = 0x6c,
+    TYPE_FLOAT16 = 0x6d,
     TYPE_FLOAT32 = 0x6e,
     TYPE_FLOAT64 = 0x6f,
     TYPE_STRINGSHORT = 0x70,
@@ -58,7 +59,7 @@ enum {
     TYPE_BIGNEGATIVE = 0x97,
 };
 
-#define SMALLINT_MAX 0x68
+#define SMALLINT_MAX 0x67
 #define SMALLINT_MIN 0x98
 
 union uint16_u
@@ -290,6 +291,21 @@ static ksbonjson_decodeStatus decodeAndReportUInt64(DecodeContext* ctx)
 #endif
 }
 
+static ksbonjson_decodeStatus decodeAndReportFloat16(DecodeContext* ctx)
+{
+    SHOULD_HAVE_ROOM_FOR_BYTES(2);
+    const uint8_t* buf = ctx->bufferCurrent;
+    ctx->bufferCurrent += 2;
+
+#if KSBONJSON_IS_LITTLE_ENDIAN
+    union float32_u u = {.b = {0, 0, buf[0], buf[1]}};
+    return ctx->callbacks->onFloat(u.f32, ctx->userData);
+#else
+    union float32_u u = {.b = {buf[1], buf[0], 0, 0}};
+    return ctx->callbacks->onFloat(u.f32, ctx->userData);
+#endif
+}
+
 static ksbonjson_decodeStatus decodeAndReportFloat32(DecodeContext* ctx)
 {
     SHOULD_HAVE_ROOM_FOR_BYTES(4);
@@ -482,6 +498,10 @@ static ksbonjson_decodeStatus decode(DecodeContext* const ctx)
             case TYPE_UINT64:
                 SHOULD_NOT_BE_EXPECTING_NAME();
                 PROPAGATE_ERROR(ctx, decodeAndReportUInt64(ctx));
+                break;
+            case TYPE_FLOAT16:
+                SHOULD_NOT_BE_EXPECTING_NAME();
+                PROPAGATE_ERROR(ctx, decodeAndReportFloat16(ctx));
                 break;
             case TYPE_FLOAT32:
                 SHOULD_NOT_BE_EXPECTING_NAME();
