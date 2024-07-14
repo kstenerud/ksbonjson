@@ -206,25 +206,62 @@ static ksbonjson_encodeStatus encodeString(KSBONJSONEncodeContext* const context
 
 static ksbonjson_encodeStatus encodeInt16(KSBONJSONEncodeContext* const context, int16_t value)
 {
-    union uint16_u u =
-    {
-        .u16 = (uint16_t)value,
-    };
-
-    likely_if(isLittleEndian())
-    {
-        #if KSBONJSON_USE_MEMCPY
-        uint8_t data[1+sizeof(u.b)];
+#if KSBONJSON_IS_LITTLE_ENDIAN
+#   if KSBONJSON_USE_MEMCPY
+        uint8_t data[sizeof(value)+1];
         data[0] = TYPE_INT16;
-        memcpy(data+1, u.b, sizeof(u.b));
-        #else
-        uint8_t data[] = {TYPE_INT16, u.b[0], u.b[1]};
-        #endif
+        memcpy(data+1, &value, sizeof(value));
         return addEncodedData(context, data, sizeof(data));
-    }
-
+#   else
+        union uint16_u u = {.u16 = (uint16_t)value};
+        uint8_t data[] = {TYPE_INT16, u.b[0], u.b[1]};
+        return addEncodedData(context, data, sizeof(data));
+#   endif
+#else
+    union uint16_u u = {.u16 = (uint16_t)value};
     uint8_t data[] = {TYPE_INT16, u.b[1], u.b[0]};
     return addEncodedData(context, data, sizeof(data));
+#endif
+}
+
+static ksbonjson_encodeStatus encodeFloat32(KSBONJSONEncodeContext* const context, float value)
+{
+#if KSBONJSON_IS_LITTLE_ENDIAN
+#   if KSBONJSON_USE_MEMCPY
+        uint8_t data[sizeof(value)+1];
+        data[0] = TYPE_FLOAT32;
+        memcpy(data+1, &value, sizeof(value));
+        return addEncodedData(context, data, sizeof(data));
+#   else
+        union float32_u u = {.f32 = value};
+        uint8_t data[] = {TYPE_FLOAT32, u.b[0], u.b[1], u.b[2], u.b[3]};
+        return addEncodedData(context, data, sizeof(data));
+#   endif
+#else
+    union float32_u u = {.f32 = value};
+    uint8_t data[] = {TYPE_FLOAT32, u.b[3], u.b[2], u.b[1], u.b[0]};
+    return addEncodedData(context, data, sizeof(data));
+#endif
+}
+
+static ksbonjson_encodeStatus encodeFloat64(KSBONJSONEncodeContext* const context, double value)
+{
+#if KSBONJSON_IS_LITTLE_ENDIAN
+#   if KSBONJSON_USE_MEMCPY
+        uint8_t data[sizeof(value)+1];
+        data[0] = TYPE_FLOAT64;
+        memcpy(data+1, &value, sizeof(value));
+        return addEncodedData(context, data, sizeof(data));
+#   else
+        union float64_u u = {.f64 = value};
+        uint8_t data[] = {TYPE_FLOAT64, u.b[0], u.b[1], u.b[2], u.b[3], u.b[4], u.b[5], u.b[6], u.b[7]};
+        return addEncodedData(context, data, sizeof(data));
+#   endif
+#else
+    union float64_u u = {.f64 = value};
+    uint8_t data[] = {TYPE_FLOAT64, u.b[7], u.b[6], u.b[5], u.b[4], u.b[3], u.b[2], u.b[1], u.b[0]};
+    return addEncodedData(context, data, sizeof(data));
+#endif
 }
 
 static ksbonjson_encodeStatus encodeBigInt(KSBONJSONEncodeContext* const context,
@@ -249,52 +286,6 @@ static ksbonjson_encodeStatus encodeBigInt(KSBONJSONEncodeContext* const context
     data[1] = (uint8_t)(index-data_offset) << 2; // Length field, no exponent
 
     return addEncodedData(context, data, index);
-}
-
-static ksbonjson_encodeStatus encodeFloat32(KSBONJSONEncodeContext* const context, float value)
-{
-    union float32_u u =
-    {
-        .f32 = value,
-    };
-
-    likely_if(isLittleEndian())
-    {
-        #if KSBONJSON_USE_MEMCPY
-        uint8_t data[1+sizeof(u.b)];
-        data[0] = TYPE_FLOAT32;
-        memcpy(data+1, u.b, sizeof(u.b));
-        #else
-        uint8_t data[] = {TYPE_FLOAT32, u.b[0], u.b[1], u.b[2], u.b[3]};
-        #endif
-        return addEncodedData(context, data, sizeof(data));
-    }
-
-    uint8_t data[] = {TYPE_FLOAT32, u.b[3], u.b[2], u.b[1], u.b[0]};
-    return addEncodedData(context, data, sizeof(data));
-}
-
-static ksbonjson_encodeStatus encodeFloat64(KSBONJSONEncodeContext* const context, double value)
-{
-    union float64_u u =
-    {
-        .f64 = value,
-    };
-
-    likely_if(isLittleEndian())
-    {
-        #if KSBONJSON_USE_MEMCPY
-        uint8_t data[1+sizeof(u.b)];
-        data[0] = TYPE_FLOAT64;
-        memcpy(data+1, u.b, sizeof(u.b));
-        #else
-        uint8_t data[] = {TYPE_FLOAT64, u.b[0], u.b[1], u.b[2], u.b[3], u.b[4], u.b[5], u.b[6], u.b[7]};
-        #endif
-        return addEncodedData(context, data, sizeof(data));
-    }
-
-    uint8_t data[] = {TYPE_FLOAT64, u.b[7], u.b[6], u.b[5], u.b[4], u.b[3], u.b[2], u.b[1], u.b[0]};
-    return addEncodedData(context, data, sizeof(data));
 }
 
 #define TRY_ENCODE_I8(VALUE, FROM_TYPE) \
