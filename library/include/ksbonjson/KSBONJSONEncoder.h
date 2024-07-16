@@ -156,6 +156,16 @@ typedef enum
     KSBONJSON_ENCODE_CONTAINERS_ARE_STILL_OPEN = 6,
 
     /**
+     * Attempted to encode a NaN value.
+     */
+    KSBONJSON_ENCODE_NAN = 7,
+
+    /**
+     * Attempted to encode an infinite value.
+     */
+    KSBONJSON_ENCODE_INF = 8,
+
+    /**
      * Generic error code that can be returned from addEncodedData().
      *
      * More specific error codes (> 100) may also be defined by the user if needed.

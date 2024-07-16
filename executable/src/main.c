@@ -331,7 +331,7 @@ static ksbonjson_encodeStatus jsonToBonjson(const char* src_path, const char* ds
     }
 
     bonjson_encode_context* ctx = new_bonjson_encode_context(documentSize*2);
-    KSBONJSONEncodeContext eContext = {0};
+    KSBONJSONEncodeContext eContext;
     ksbonjson_beginEncode(&eContext, addEncodedDataCallback, ctx);
     ksbonjson_encodeStatus status = parseJsonElement(root, &eContext);
     if(status != KSBONJSON_ENCODE_OK)

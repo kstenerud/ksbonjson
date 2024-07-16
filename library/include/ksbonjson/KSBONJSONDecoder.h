@@ -221,13 +221,22 @@ typedef struct KSBONJSONDecodeCallbacks
     /**
      * Called when a string element value is decoded.
      *
+     * The string data has NOT been validated against UTF-8!
+     *
+     * Even after validation, the string data could in theory contain NUL
+     * characters (which are valid in JSON).
+     *
+     * Note: value[length] will always be the closing delimiter (0xff), so
+     *       if the source document is writable, you could overwrite the
+     *       delimiter with 0 to create a zero-copy null-terminated string.
+     *
      * @param value The element's value.
-     * @param valueLength The value's length.
+     * @param length The value's length.
      * @param userData Data that was specified when calling ksbonjson_decode().
      * @return KSBONJSON_DECODE_OK if decoding should continue.
      */
     ksbonjson_decodeStatus (*onString)(const char* KSBONJSON_RESTRICT value,
-                                       size_t valueLength,
+                                       size_t length,
                                        void* KSBONJSON_RESTRICT userData);
 
     /**
