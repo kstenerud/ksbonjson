@@ -45,24 +45,6 @@
 #endif
 
 /**
- * If enabled, use BigNumber encoding for integers from 33 to 48 bits long.
- * This is less CPU-efficient, but produces values 1-2 bytes smaller in that range.
- */
-#ifndef KSBONJSON_OPTIMIZE_SPACE
-#   define KSBONJSON_OPTIMIZE_SPACE 1
-#endif
-
-/**
- * memcpy() offers more optimization opportunities.
- * If memcpy is not used, this library will have zero dependencies.
- * However, if your compiler supports memcpy intrinsics, it may have
- * zero dependencies regardless.
- */
-#ifndef KSBONJSON_USE_MEMCPY
-#   define KSBONJSON_USE_MEMCPY 1
-#endif
-
-/**
  * The restrict modifier, if available, increases optimization opportunities.
  */
 #ifndef KSBONJSON_RESTRICT
@@ -171,7 +153,12 @@ typedef enum
     /**
      * Expected to find a string for an object element name.
      */
-    KSBONJSON_DECODE_EXPECTED_STRING = 6,
+    KSBONJSON_DECODE_EXPECTED_OBJECT_NAME = 6,
+
+    /**
+     * Got an end container while expecting an object element value.
+     */
+    KSBONJSON_DECODE_EXPECTED_OBJECT_VALUE = 7,
 
     /**
      * Generic error code that can be returned from a callback.
@@ -242,20 +229,6 @@ typedef struct KSBONJSONDecodeCallbacks
     ksbonjson_decodeStatus (*onString)(const char* KSBONJSON_RESTRICT value,
                                        size_t valueLength,
                                        void* KSBONJSON_RESTRICT userData);
-
-    /**
-     * Called when a chunk of a string element value is decoded.
-     *
-     * @param chunk The chunk's value.
-     * @param chunkLength The chunk's length.
-     * @param isLastChunk If true, this is the last chunk for this string element.
-     * @param userData Data that was specified when calling ksbonjson_decode().
-     * @return KSBONJSON_DECODE_OK if decoding should continue.
-     */
-    ksbonjson_decodeStatus (*onStringChunk)(const char* KSBONJSON_RESTRICT chunk,
-                                            size_t chunkLength,
-                                            bool isLastChunk,
-                                            void* KSBONJSON_RESTRICT userData);
 
     /**
      * Called when a new object is encountered.

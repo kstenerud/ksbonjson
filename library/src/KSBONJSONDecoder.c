@@ -26,9 +26,7 @@
 
 #include <ksbonjson/KSBONJSONDecoder.h>
 
-#if KSBONJSON_USE_MEMCPY
 #include <string.h>
-#endif
 
 
 // ============================================================================
@@ -40,43 +38,41 @@
 #define unlikely_if(x) if(__builtin_expect(x,0))
 
 enum {
-    TYPE_NULL = 0x68,
-    TYPE_INT16 = 0x69,
-    TYPE_INT32 = 0x6a,
-    TYPE_INT64 = 0x6b,
-    TYPE_UINT64 = 0x6c,
-    TYPE_FLOAT16 = 0x6d,
-    TYPE_FLOAT32 = 0x6e,
-    TYPE_FLOAT64 = 0x6f,
-    TYPE_STRINGSHORT = 0x70,
-    TYPE_STRINGLONG = 0x90,
-    TYPE_ARRAY = 0x91,
-    TYPE_OBJECT = 0x92,
-    TYPE_END = 0x93,
-    TYPE_FALSE = 0x94,
-    TYPE_TRUE = 0x95,
-    TYPE_BIGPOSITIVE = 0x96,
-    TYPE_BIGNEGATIVE = 0x97,
+    TYPE_ARRAY = 0xeb,
+    TYPE_OBJECT = 0xec,
+    TYPE_END = 0xed,
+    TYPE_FALSE = 0xee,
+    TYPE_TRUE = 0xef,
+    TYPE_NULL = 0xf0,
+    TYPE_INT8 = 0xf1,
+    TYPE_INT16 = 0xf2,
+    TYPE_INT24 = 0xf3,
+    TYPE_INT32 = 0xf4,
+    TYPE_INT40 = 0xf5,
+    TYPE_INT48 = 0xf6,
+    TYPE_INT56 = 0xf7,
+    TYPE_INT64 = 0xf8,
+    TYPE_UINT64 = 0xf9,
+    TYPE_BIGPOSITIVE = 0xfa,
+    TYPE_BIGNEGATIVE = 0xfb,
+    TYPE_FLOAT16 = 0xfc,
+    TYPE_FLOAT32 = 0xfd,
+    TYPE_FLOAT64 = 0xfe,
+    TYPE_STRING = 0xff,
 };
 
-#define SMALLINT_MAX 0x67
-#define SMALLINT_MIN 0x98
-
-union uint16_u
-{
-    uint16_t u16;
-    uint8_t b[2];
-};
-
-union uint32_u
-{
-    uint32_t u32;
-    uint8_t b[4];
-};
+#define INTSMALL_MAX 234
+#define INTSMALL_BIAS 117
 
 union uint64_u
 {
     uint64_t u64;
+    uint8_t b[8];
+};
+
+union int64_u
+{
+    int64_t i64;
     uint8_t b[8];
 };
 
@@ -100,16 +96,15 @@ union float64_u
 
 typedef struct
 {
-    uint8_t isInObject: 1;
+    uint8_t isObject: 1;
     uint8_t isExpectingName: 1;
     uint8_t isChunkingString: 1;
-} DecodeFrame;
+} ContainerState;
 
 typedef struct
 {
-    int stackDepth;
-    int maxDepth;
-    DecodeFrame stack[KSBONJSON_MAX_CONTAINER_DEPTH];
+    int containerDepth;
+    ContainerState containers[KSBONJSON_MAX_CONTAINER_DEPTH];
     const uint8_t* bufferStart;
     const uint8_t* bufferCurrent;
     const uint8_t* bufferEnd;
@@ -207,67 +202,43 @@ static ksbonjson_decodeStatus decodeBigNumber(DecodeContext* ctx, uint64_t* pSig
     return KSBONJSON_DECODE_OK;
 }
 
-static ksbonjson_decodeStatus decodeAndReportInt16(DecodeContext* ctx)
+static ksbonjson_decodeStatus decodeAndReportIntSmall(DecodeContext* ctx, int value)
 {
-    SHOULD_HAVE_ROOM_FOR_BYTES(2);
-    const uint8_t* buf = ctx->bufferCurrent;
-    ctx->bufferCurrent += 2;
-
-#if KSBONJSON_IS_LITTLE_ENDIAN
-#   if KSBONJSON_USE_MEMCPY
-        int16_t value;
-        memcpy(&value, buf, sizeof(value));
-        return ctx->callbacks->onInteger(value, ctx->userData);
-#   else
-        union uint16_u u = {.b = {buf[0], buf[1]}};
-        return ctx->callbacks->onInteger((int16_t)u.u16, ctx->userData);
-#   endif
-#else
-    union uint16_u u = {.b = {buf[1], buf[0]}};
-    return ctx->callbacks->onInteger((int16_t)u.u16, ctx->userData);
-#endif
+    return ctx->callbacks->onInteger(value - INTSMALL_BIAS, ctx->userData);
 }
 
-static ksbonjson_decodeStatus decodeAndReportInt32(DecodeContext* ctx)
+static ksbonjson_decodeStatus decodeAndReportInt8(DecodeContext* ctx)
 {
-    SHOULD_HAVE_ROOM_FOR_BYTES(4);
-    const uint8_t* buf = ctx->bufferCurrent;
-    ctx->bufferCurrent += 4;
+    SHOULD_HAVE_ROOM_FOR_BYTES(1);
+    int value = (int8_t)*ctx->bufferCurrent;
+    ctx->bufferCurrent += 1;
 
-#if KSBONJSON_IS_LITTLE_ENDIAN
-#   if KSBONJSON_USE_MEMCPY
-        int32_t value;
-        memcpy(&value, buf, sizeof(value));
-        return ctx->callbacks->onInteger(value, ctx->userData);
-#   else
-        union uint32_u u = {.b = {buf[0], buf[1], buf[2], buf[3]}};
-        return ctx->callbacks->onInteger((int32_t)u.u32, ctx->userData);
-#   endif
-#else
-    union uint32_u u = {.b = {buf[3], buf[2], buf[1], buf[0]}};
-    return ctx->callbacks->onInteger((int32_t)u.u32, ctx->userData);
-#endif
+    if(value < 0)
+    {
+        return ctx->callbacks->onInteger(value - INTSMALL_BIAS, ctx->userData);
+    }
+    return ctx->callbacks->onInteger(value + (INTSMALL_BIAS+1), ctx->userData);
 }
 
-static ksbonjson_decodeStatus decodeAndReportInt64(DecodeContext* ctx)
+static ksbonjson_decodeStatus decodeAndReportInt(DecodeContext* ctx, int size)
 {
-    SHOULD_HAVE_ROOM_FOR_BYTES(8);
+    SHOULD_HAVE_ROOM_FOR_BYTES(size);
     const uint8_t* buf = ctx->bufferCurrent;
-    ctx->bufferCurrent += 8;
+    ctx->bufferCurrent += size;
 
 #if KSBONJSON_IS_LITTLE_ENDIAN
-#   if KSBONJSON_USE_MEMCPY
-        int64_t value;
-        memcpy(&value, buf, sizeof(value));
-        return ctx->callbacks->onInteger(value, ctx->userData);
-#   else
-        union uint64_u u = {.b = {buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]}};
-        return ctx->callbacks->onInteger((int64_t)u.u64, ctx->userData);
-#   endif
+    // Use the highest byte to sign-extend init the int64
+    union int64_u u = {.i64 = (int8_t)buf[size-1]};
+    memcpy(u.b, buf, size);
 #else
-    union uint64_u u = {.b = {buf[7], buf[6], buf[5], buf[4], buf[3], buf[2], buf[1], buf[0]}};
-    return ctx->callbacks->onInteger((int64_t)u.u64, ctx->userData);
+    // Use the highest byte to sign-extend init the int64
+    union int64_u u = {.i64 = (int8_t)buf[0]};
+    for(int i = 0; i < size; i++)
+    {
+        u.b[i] = buf[(size-1) - i];
+    }
 #endif
+    return ctx->callbacks->onInteger(u.i64, ctx->userData);
 }
 
 static ksbonjson_decodeStatus decodeAndReportUInt64(DecodeContext* ctx)
@@ -277,14 +248,9 @@ static ksbonjson_decodeStatus decodeAndReportUInt64(DecodeContext* ctx)
     ctx->bufferCurrent += 8;
 
 #if KSBONJSON_IS_LITTLE_ENDIAN
-#   if KSBONJSON_USE_MEMCPY
-        uint64_t value;
-        memcpy(&value, buf, sizeof(value));
-        return ctx->callbacks->onUInteger(value, ctx->userData);
-#   else
-        union uint64_u u = {.b = {buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]}};
-        return ctx->callbacks->onUInteger(u.u64, ctx->userData);
-#   endif
+    uint64_t value;
+    memcpy(&value, buf, sizeof(value));
+    return ctx->callbacks->onUInteger(value, ctx->userData);
 #else
     union uint64_u u = {.b = {buf[7], buf[6], buf[5], buf[4], buf[3], buf[2], buf[1], buf[0]}};
     return ctx->callbacks->onUInteger(u.u64, ctx->userData);
@@ -313,14 +279,9 @@ static ksbonjson_decodeStatus decodeAndReportFloat32(DecodeContext* ctx)
     ctx->bufferCurrent += 4;
 
 #if KSBONJSON_IS_LITTLE_ENDIAN
-#   if KSBONJSON_USE_MEMCPY
-        float value;
-        memcpy(&value, buf, sizeof(value));
-        return ctx->callbacks->onFloat(value, ctx->userData);
-#   else
-        union float32_u u = {.b = {buf[0], buf[1], buf[2], buf[3]}};
-        return ctx->callbacks->onFloat(u.f32, ctx->userData);
-#   endif
+    float value;
+    memcpy(&value, buf, sizeof(value));
+    return ctx->callbacks->onFloat(value, ctx->userData);
 #else
     union float32_u u = {.b = {buf[3], buf[2], buf[1], buf[0]}};
     return ctx->callbacks->onFloat(u.f32, ctx->userData);
@@ -334,14 +295,9 @@ static ksbonjson_decodeStatus decodeAndReportFloat64(DecodeContext* ctx)
     ctx->bufferCurrent += 8;
 
 #if KSBONJSON_IS_LITTLE_ENDIAN
-#   if KSBONJSON_USE_MEMCPY
-        double value;
-        memcpy(&value, buf, sizeof(value));
-        return ctx->callbacks->onFloat(value, ctx->userData);
-#   else
-        union float64_u u = {.b = {buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]}};
-        return ctx->callbacks->onFloat(u.f64, ctx->userData);
-#   endif
+    double value;
+    memcpy(&value, buf, sizeof(value));
+    return ctx->callbacks->onFloat(value, ctx->userData);
 #else
     union float64_u u = {.b = {buf[7], buf[6], buf[5], buf[4], buf[3], buf[2], buf[1], buf[0]}};
     return ctx->callbacks->onFloat(u.f64, ctx->userData);
@@ -370,73 +326,47 @@ static ksbonjson_decodeStatus decodeAndReportNegativeBigNumber(DecodeContext* ct
     return ctx->callbacks->onInteger(-((int64_t)significand), ctx->userData);
 }
 
-static ksbonjson_decodeStatus decodeAndReportShortString(DecodeContext* ctx, uint8_t typeCode)
+static ksbonjson_decodeStatus decodeAndReportString(DecodeContext* ctx)
 {
-    size_t length = typeCode - TYPE_STRINGSHORT;
-    SHOULD_HAVE_ROOM_FOR_BYTES(length);
-    char* string = (char*)ctx->bufferCurrent;
-    ctx->bufferCurrent += length;
-    return ctx->callbacks->onString(string, length, ctx->userData);
-}
+    const uint8_t* pos = ctx->bufferCurrent;
+    const char* begin = (const char*)pos;
+    const uint8_t* end = ctx->bufferEnd;
 
-static ksbonjson_decodeStatus decodeAndReportLongString(DecodeContext* ctx)
-{
-    uint64_t header = 0;
-    PROPAGATE_ERROR(ctx, decodeUleb128(ctx, &header));
-    bool continuation = header & 1;
-    uint64_t length = header >> 1;
-    SHOULD_HAVE_ROOM_FOR_BYTES(length);
-    const char* str = (char*)ctx->bufferCurrent;
-    ctx->bufferCurrent += length;
-    const KSBONJSONDecodeCallbacks* callbacks = ctx->callbacks;
-    likely_if(!continuation) // The most common pattern is single chunk
+    for(; pos < end; pos++)
     {
-        return callbacks->onString(str, length, ctx->userData);
+        if(*pos == TYPE_STRING)
+        {
+            size_t length = pos - ctx->bufferCurrent;
+            ctx->bufferCurrent += length + 1;
+            return ctx->callbacks->onString(begin, length, ctx->userData);
+        }
     }
 
-    PROPAGATE_ERROR(ctx, callbacks->onStringChunk(str,
-                                                  length,
-                                                  !continuation,
-                                                  ctx->userData));
-    while(continuation)
-    {
-        PROPAGATE_ERROR(ctx, decodeUleb128(ctx, &header));
-        continuation = header & 1;
-        length = header >> 1;
-        SHOULD_HAVE_ROOM_FOR_BYTES(length);
-        str = (char*)ctx->bufferCurrent;
-        ctx->bufferCurrent += length;
-        PROPAGATE_ERROR(ctx, callbacks->onStringChunk(str,
-                                                      length,
-                                                      !continuation,
-                                                      ctx->userData));
-    }
-
-    return KSBONJSON_DECODE_OK;
+    return KSBONJSON_DECODE_INCOMPLETE;
 }
 
-static ksbonjson_decodeStatus stackContainer(DecodeContext* ctx, bool isObject)
+static ksbonjson_decodeStatus beginContainer(DecodeContext* ctx, bool isObject)
 {
-    unlikely_if(ctx->stackDepth > KSBONJSON_MAX_CONTAINER_DEPTH)
+    unlikely_if(ctx->containerDepth > KSBONJSON_MAX_CONTAINER_DEPTH)
     {
         return KSBONJSON_DECODE_CONTAINER_DEPTH_EXCEEDED;
     }
-    ctx->stackDepth++;
-    DecodeFrame* frame = &ctx->stack[ctx->stackDepth];
-    frame->isChunkingString = false;
-    frame->isExpectingName = isObject;
-    frame->isInObject = isObject;
+    ctx->containerDepth++;
+    ContainerState* container = &ctx->containers[ctx->containerDepth];
+    container->isChunkingString = false;
+    container->isExpectingName = isObject;
+    container->isObject = isObject;
 
     return KSBONJSON_DECODE_OK;
 }
 
-static ksbonjson_decodeStatus unstackContainer(DecodeContext* ctx)
+static ksbonjson_decodeStatus endContainer(DecodeContext* ctx)
 {
-    unlikely_if(ctx->stackDepth <= 0)
+    unlikely_if(ctx->containerDepth <= 0)
     {
         return KSBONJSON_DECODE_UNBALANCED_CONTAINERS;
     }
-    ctx->stackDepth--;
+    ctx->containerDepth--;
 
     return KSBONJSON_DECODE_OK;
 }
@@ -449,103 +379,107 @@ static ksbonjson_decodeStatus decode(DecodeContext* const ctx)
     #define SHOULD_NOT_BE_EXPECTING_NAME() \
         do \
         { \
-            unlikely_if(currentFrame->isInObject && currentFrame->isExpectingName) \
+            unlikely_if(currentFrame->isObject && currentFrame->isExpectingName) \
             { \
-                return KSBONJSON_DECODE_EXPECTED_STRING; \
+                return KSBONJSON_DECODE_EXPECTED_OBJECT_NAME; \
             } \
         } \
         while(0)
 
     while(ctx->bufferCurrent < ctx->bufferEnd)
     {
-        DecodeFrame* currentFrame = &ctx->stack[ctx->stackDepth];
+        ContainerState* currentFrame = &ctx->containers[ctx->containerDepth];
         uint8_t typeCode = *ctx->bufferCurrent++;
-        if(typeCode <= SMALLINT_MAX)
+        if(typeCode <= INTSMALL_MAX)
         {
             SHOULD_NOT_BE_EXPECTING_NAME();
-            PROPAGATE_ERROR(ctx, callbacks->onUInteger(typeCode, userData));
+            PROPAGATE_ERROR(ctx, decodeAndReportIntSmall(ctx, typeCode));
         }
-        else if(typeCode >= SMALLINT_MIN)
+        else if(typeCode == TYPE_STRING)
+        {
+            PROPAGATE_ERROR(ctx, decodeAndReportString(ctx));
+        }
+        else if(typeCode == TYPE_END)
+        {
+            unlikely_if(currentFrame->isObject && !currentFrame->isExpectingName)
+            {
+                return KSBONJSON_DECODE_EXPECTED_OBJECT_VALUE;
+            }
+            PROPAGATE_ERROR(ctx, callbacks->onEndContainer(userData));
+            PROPAGATE_ERROR(ctx, endContainer(ctx));
+        }
+        else
         {
             SHOULD_NOT_BE_EXPECTING_NAME();
-            PROPAGATE_ERROR(ctx, callbacks->onInteger((int8_t)typeCode, userData));
-        }
-        else if(typeCode >= TYPE_STRINGSHORT && typeCode < TYPE_STRINGSHORT + 32)
-        {
-            PROPAGATE_ERROR(ctx, decodeAndReportShortString(ctx, typeCode));
-        }
-        else switch(typeCode)
-        {
-            case TYPE_STRINGLONG:
-                PROPAGATE_ERROR(ctx, decodeAndReportLongString(ctx));
-                break;
-            case TYPE_NULL:
-                SHOULD_NOT_BE_EXPECTING_NAME();
-                PROPAGATE_ERROR(ctx, callbacks->onNull(userData));
-                break;
-            case TYPE_INT16:
-                SHOULD_NOT_BE_EXPECTING_NAME();
-                PROPAGATE_ERROR(ctx, decodeAndReportInt16(ctx));
-                break;
-            case TYPE_INT32:
-                SHOULD_NOT_BE_EXPECTING_NAME();
-                PROPAGATE_ERROR(ctx, decodeAndReportInt32(ctx));
-                break;
-            case TYPE_INT64:
-                SHOULD_NOT_BE_EXPECTING_NAME();
-                PROPAGATE_ERROR(ctx, decodeAndReportInt64(ctx));
-                break;
-            case TYPE_UINT64:
-                SHOULD_NOT_BE_EXPECTING_NAME();
-                PROPAGATE_ERROR(ctx, decodeAndReportUInt64(ctx));
-                break;
-            case TYPE_FLOAT16:
-                SHOULD_NOT_BE_EXPECTING_NAME();
-                PROPAGATE_ERROR(ctx, decodeAndReportFloat16(ctx));
-                break;
-            case TYPE_FLOAT32:
-                SHOULD_NOT_BE_EXPECTING_NAME();
-                PROPAGATE_ERROR(ctx, decodeAndReportFloat32(ctx));
-                break;
-            case TYPE_FLOAT64:
-                SHOULD_NOT_BE_EXPECTING_NAME();
-                PROPAGATE_ERROR(ctx, decodeAndReportFloat64(ctx));
-                break;
-            case TYPE_BIGPOSITIVE:
-                SHOULD_NOT_BE_EXPECTING_NAME();
-                PROPAGATE_ERROR(ctx, decodeAndReportPositiveBigNumber(ctx));
-                break;
-            case TYPE_BIGNEGATIVE:
-                SHOULD_NOT_BE_EXPECTING_NAME();
-                PROPAGATE_ERROR(ctx, decodeAndReportNegativeBigNumber(ctx));
-                break;
-            case TYPE_ARRAY:
-                SHOULD_NOT_BE_EXPECTING_NAME();
-                PROPAGATE_ERROR(ctx, callbacks->onBeginArray(userData));
-                PROPAGATE_ERROR(ctx, stackContainer(ctx, false));
-                break;
-            case TYPE_OBJECT:
-                SHOULD_NOT_BE_EXPECTING_NAME();
-                PROPAGATE_ERROR(ctx, callbacks->onBeginObject(userData));
-                PROPAGATE_ERROR(ctx, stackContainer(ctx, true));
-                break;
-            case TYPE_END:
-                PROPAGATE_ERROR(ctx, callbacks->onEndContainer(userData));
-                PROPAGATE_ERROR(ctx, unstackContainer(ctx));
-                break;
-            case TYPE_FALSE:
-                SHOULD_NOT_BE_EXPECTING_NAME();
-                PROPAGATE_ERROR(ctx, callbacks->onBoolean(false, userData));
-                break;
-            case TYPE_TRUE:
-                SHOULD_NOT_BE_EXPECTING_NAME();
-                PROPAGATE_ERROR(ctx, callbacks->onBoolean(true, userData));
-                break;
+            switch(typeCode)
+            {
+                case TYPE_STRING:
+                    break;
+                case TYPE_NULL:
+                    PROPAGATE_ERROR(ctx, callbacks->onNull(userData));
+                    break;
+                case TYPE_INT8:
+                    PROPAGATE_ERROR(ctx, decodeAndReportInt8(ctx));
+                    break;
+                case TYPE_INT16:
+                    PROPAGATE_ERROR(ctx, decodeAndReportInt(ctx, 2));
+                    break;
+                case TYPE_INT24:
+                    PROPAGATE_ERROR(ctx, decodeAndReportInt(ctx, 3));
+                    break;
+                case TYPE_INT32:
+                    PROPAGATE_ERROR(ctx, decodeAndReportInt(ctx, 4));
+                    break;
+                case TYPE_INT40:
+                    PROPAGATE_ERROR(ctx, decodeAndReportInt(ctx, 5));
+                    break;
+                case TYPE_INT48:
+                    PROPAGATE_ERROR(ctx, decodeAndReportInt(ctx, 6));
+                    break;
+                case TYPE_INT56:
+                    PROPAGATE_ERROR(ctx, decodeAndReportInt(ctx, 7));
+                    break;
+                case TYPE_INT64:
+                    PROPAGATE_ERROR(ctx, decodeAndReportInt(ctx, 8));
+                    break;
+                case TYPE_UINT64:
+                    PROPAGATE_ERROR(ctx, decodeAndReportUInt64(ctx));
+                    break;
+                case TYPE_FLOAT16:
+                    PROPAGATE_ERROR(ctx, decodeAndReportFloat16(ctx));
+                    break;
+                case TYPE_FLOAT32:
+                    PROPAGATE_ERROR(ctx, decodeAndReportFloat32(ctx));
+                    break;
+                case TYPE_FLOAT64:
+                    PROPAGATE_ERROR(ctx, decodeAndReportFloat64(ctx));
+                    break;
+                case TYPE_BIGPOSITIVE:
+                    PROPAGATE_ERROR(ctx, decodeAndReportPositiveBigNumber(ctx));
+                    break;
+                case TYPE_BIGNEGATIVE:
+                    PROPAGATE_ERROR(ctx, decodeAndReportNegativeBigNumber(ctx));
+                    break;
+                case TYPE_ARRAY:
+                    PROPAGATE_ERROR(ctx, callbacks->onBeginArray(userData));
+                    PROPAGATE_ERROR(ctx, beginContainer(ctx, false));
+                    break;
+                case TYPE_OBJECT:
+                    PROPAGATE_ERROR(ctx, callbacks->onBeginObject(userData));
+                    PROPAGATE_ERROR(ctx, beginContainer(ctx, true));
+                    break;
+                case TYPE_FALSE:
+                    PROPAGATE_ERROR(ctx, callbacks->onBoolean(false, userData));
+                    break;
+                case TYPE_TRUE:
+                    PROPAGATE_ERROR(ctx, callbacks->onBoolean(true, userData));
+                    break;
+            }
         }
         currentFrame->isExpectingName = !currentFrame->isExpectingName;
     }
 
-    unlikely_if(ctx->stackDepth > 0)
+    unlikely_if(ctx->containerDepth > 0)
     {
         return KSBONJSON_DECODE_UNCLOSED_CONTAINERS;
     }
@@ -563,7 +497,7 @@ ksbonjson_decodeStatus ksbonjson_decode(const uint8_t* document,
                                         void* userData,
                                         size_t* decodedOffset)
 {
-    DecodeContext context =
+    DecodeContext ctx =
     {
         .bufferStart = document,
         .bufferCurrent = document,
@@ -572,8 +506,8 @@ ksbonjson_decodeStatus ksbonjson_decode(const uint8_t* document,
         .userData = userData,
     };
 
-    ksbonjson_decodeStatus result = decode(&context);
-    *decodedOffset = context.bufferCurrent - context.bufferStart;
+    ksbonjson_decodeStatus result = decode(&ctx);
+    *decodedOffset = ctx.bufferCurrent - ctx.bufferStart;
     return result;
 }
 
@@ -593,6 +527,10 @@ const char* ksbonjson_decodeStatusDescription(ksbonjson_decodeStatus status)
             return "The document had too much container depth";
         case KSBONJSON_DECODE_UNBALANCED_CONTAINERS:
             return "Tried to close too many containers";
+        case KSBONJSON_DECODE_EXPECTED_OBJECT_NAME:
+            return "Expected to find a string for an object element name";
+        case KSBONJSON_DECODE_EXPECTED_OBJECT_VALUE:
+            return "Got an end container while expecting an object element value";
         case KSBONJSON_DECODE_COULD_NOT_PROCESS_DATA:
             return "A callback failed to process the passed in data";
         default:

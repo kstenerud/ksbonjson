@@ -23,9 +23,7 @@ project_test_files = [
 
 build_args = [
 # To test all compile-time code paths:
-#  '-DKSBONJSON_USE_MEMCPY=0',
 #  '-DKSBONJSON_IS_LITTLE_ENDIAN=0',
-#  '-DKSBONJSON_OPTIMIZE_SPACE=0',
 ]
 
 

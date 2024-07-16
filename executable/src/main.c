@@ -447,20 +447,6 @@ static ksbonjson_decodeStatus onString(const char* KSBONJSON_RESTRICT value,
     }
 }
 
-static ksbonjson_decodeStatus onStringChunk(const char* KSBONJSON_RESTRICT value,
-                                            size_t length,
-                                            bool isLastChunk,
-                                            void* KSBONJSON_RESTRICT userData)
-{
-    if(isLastChunk)
-    {
-        return onString(value, length, userData);
-    }
-
-    // TODO
-    return 10000;
-}
-
 static ksbonjson_decodeStatus onBeginObject(void* userData)
 {
     DecoderContext* ctx = (DecoderContext*)userData;
@@ -512,7 +498,6 @@ static void init_decoder_context(DecoderContext* ctx)
     ctx->callbacks.onInteger = onInteger;
     ctx->callbacks.onNull = onNull;
     ctx->callbacks.onString = onString;
-    ctx->callbacks.onStringChunk = onStringChunk;
     ctx->callbacks.onUInteger = onUInteger;
 }
 

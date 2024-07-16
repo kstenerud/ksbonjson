@@ -45,24 +45,6 @@
 #endif
 
 /**
- * If enabled, use BigNumber encoding for integers from 33 to 48 bits long.
- * This is less CPU-efficient, but produces values 1-2 bytes smaller in that range.
- */
-#ifndef KSBONJSON_OPTIMIZE_SPACE
-#   define KSBONJSON_OPTIMIZE_SPACE 1
-#endif
-
-/**
- * memcpy() offers more optimization opportunities.
- * If memcpy is not used, this library will have zero dependencies.
- * However, if your compiler supports memcpy intrinsics, it may have
- * zero dependencies regardless.
- */
-#ifndef KSBONJSON_USE_MEMCPY
-#   define KSBONJSON_USE_MEMCPY 1
-#endif
-
-/**
  * The restrict modifier, if available, increases optimization opportunities.
  */
 #ifndef KSBONJSON_RESTRICT
@@ -195,7 +177,7 @@ typedef ksbonjson_encodeStatus (*KSBONJSONAddEncodedDataFunc)(const uint8_t* KSB
 
 typedef struct
 {
-    uint8_t isInObject: 1;
+    uint8_t isObject: 1;
     uint8_t isExpectingName: 1;
     uint8_t isChunkingString: 1;
 } KSBONJSONContainerState;
@@ -296,7 +278,7 @@ KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addString(KSBONJSONEncodeConte
                                                             size_t valueLength);
 
 /**
- * Build a string element in chunks. When isLastChunk is true, the string is considered complete.
+ * Build a string element progressively in chunks. When isLastChunk is true, the string is considered complete.
  *
  * @param context The encoding context.
  * @param chunk The string chunk.
