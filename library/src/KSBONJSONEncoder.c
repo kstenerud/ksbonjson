@@ -36,32 +36,60 @@
 #define likely_if(x) if(__builtin_expect(x,1))
 #define unlikely_if(x) if(__builtin_expect(x,0))
 
-enum {
-    TYPE_ARRAY = 0xeb,
-    TYPE_OBJECT = 0xec,
-    TYPE_END = 0xed,
-    TYPE_FALSE = 0xee,
-    TYPE_TRUE = 0xef,
-    TYPE_NULL = 0xf0,
-    TYPE_INT8 = 0xf1,
-    TYPE_INT16 = 0xf2,
-    TYPE_INT24 = 0xf3,
-    TYPE_INT32 = 0xf4,
-    TYPE_INT40 = 0xf5,
-    TYPE_INT48 = 0xf6,
-    TYPE_INT56 = 0xf7,
-    TYPE_INT64 = 0xf8,
-    TYPE_UINT64 = 0xf9,
-    TYPE_BIGPOSITIVE = 0xfa,
-    TYPE_BIGNEGATIVE = 0xfb,
-    TYPE_FLOAT16 = 0xfc,
-    TYPE_FLOAT32 = 0xfd,
-    TYPE_FLOAT64 = 0xfe,
-    TYPE_STRING = 0xff,
+enum
+{
+    TYPE_ARRAY = 0x91,
+    TYPE_OBJECT = 0x92,
+    TYPE_END = 0x93,
+    TYPE_FALSE = 0x94,
+    TYPE_TRUE = 0x95,
+    TYPE_NULL = 0x96,
+    TYPE_UINT8 = 0x70,
+    TYPE_UINT16 = 0x71,
+    TYPE_UINT24 = 0x72,
+    TYPE_UINT32 = 0x73,
+    TYPE_UINT40 = 0x74,
+    TYPE_UINT48 = 0x75,
+    TYPE_UINT56 = 0x76,
+    TYPE_UINT64 = 0x77,
+    TYPE_SINT8 = 0x78,
+    TYPE_SINT16 = 0x79,
+    TYPE_SINT24 = 0x7a,
+    TYPE_SINT32 = 0x7b,
+    TYPE_SINT40 = 0x7c,
+    TYPE_SINT48 = 0x7d,
+    TYPE_SINT56 = 0x7e,
+    TYPE_SINT64 = 0x7f,
+    TYPE_BIGPOSITIVE = 0x6e,
+    TYPE_BIGNEGATIVE = 0x6f,
+    TYPE_FLOAT16 = 0x6b,
+    TYPE_FLOAT32 = 0x6c,
+    TYPE_FLOAT64 = 0x6d,
+    TYPE_STRING = 0x90,
+    TYPE_STRING0 = 0x80,
+    TYPE_STRING1 = 0x81,
+    TYPE_STRING2 = 0x82,
+    TYPE_STRING3 = 0x83,
+    TYPE_STRING4 = 0x84,
+    TYPE_STRING5 = 0x85,
+    TYPE_STRING6 = 0x86,
+    TYPE_STRING7 = 0x87,
+    TYPE_STRING8 = 0x88,
+    TYPE_STRING9 = 0x89,
+    TYPE_STRING10 = 0x8a,
+    TYPE_STRING11 = 0x8b,
+    TYPE_STRING12 = 0x8c,
+    TYPE_STRING13 = 0x8d,
+    TYPE_STRING14 = 0x8e,
+    TYPE_STRING15 = 0x8f,
 };
 
-#define INTSMALL_MAX 234
-#define INTSMALL_BIAS 117
+enum
+{
+    STRING_TERMINATOR = 0xff,
+    INTSMALL_NEGATIVE_EDGE = -105,
+    INTSMALL_POSITIVE_EDGE = 106,
+};
 
 union uint64_u
 {
@@ -204,47 +232,18 @@ ksbonjson_encodeStatus ksbonjson_addBoolean(KSBONJSONEncodeContext* const ctx, c
     return addByte(ctx, value ? TYPE_TRUE : TYPE_FALSE);
 }
 
-ksbonjson_encodeStatus ksbonjson_addInteger(KSBONJSONEncodeContext* const ctx, const int64_t value)
+static ksbonjson_encodeStatus encodeIntegerType(KSBONJSONEncodeContext* const ctx, const uint8_t typeCode, const uint64_t value, size_t byteCount)
 {
-    KSBONJSONContainerState* const container = &ctx->containers[ctx->containerDepth];
-    SHOULD_NOT_BE_EXPECTING_OBJECT_NAME();
-    SHOULD_NOT_BE_CHUNKING_STRING();
-
-    container->isExpectingName = true;
-    if(value >= -INTSMALL_BIAS && value <= INTSMALL_MAX - INTSMALL_BIAS)
-    {
-        // Small Int
-        return addByte(ctx, (uint8_t)(value + INTSMALL_BIAS));
-    }
-    if(value >= (-128 - INTSMALL_BIAS) && value <= (127 + INTSMALL_BIAS + 1))
-    {
-        // Int8
-        uint8_t data[] =
-        {
-            TYPE_INT8,
-            (uint8_t)(value + (value < 0 ? INTSMALL_BIAS : -INTSMALL_BIAS - 1)),
-        };
-        return addBytes(ctx, data, sizeof(data));
-    }
-
-    // Integers from 2 to 8 bytes
-    int byteCount = 2;
-    const int64_t endValue = value < 0 ? -1 : 0;
-    for(int64_t v = value >> 15; v != endValue; v >>= 8)
-    {
-        byteCount++;
-    }
-
     // Allocate 2 unions to give scratch space in front of the encoded u64
     union uint64_u u[2];
-    u[1].u64 = (uint64_t)value;
+    u[1].u64 = value;
 #if KSBONJSON_IS_LITTLE_ENDIAN
     // The last byte of our scratch space will hold the type code
-    u[0].b[7] = 0xf0 + byteCount;
+    u[0].b[7] = typeCode + byteCount - 1;
     return addBytes(ctx, &u[0].b[7], byteCount + 1);
 #else
     uint8_t data[byteCount + 1];
-    data[0] = 0xf0 + byteCount; // Type code
+    data[0] = typeCode + byteCount - 1;
     for(int i = 0; i < byteCount; i++)
     {
         data[byteCount - i] = u[1].b[i];
@@ -253,12 +252,67 @@ ksbonjson_encodeStatus ksbonjson_addInteger(KSBONJSONEncodeContext* const ctx, c
 #endif
 }
 
+ksbonjson_encodeStatus ksbonjson_addUnsignedInteger(KSBONJSONEncodeContext* const ctx, const uint64_t value)
+{
+    KSBONJSONContainerState* const container = &ctx->containers[ctx->containerDepth];
+    SHOULD_NOT_BE_EXPECTING_OBJECT_NAME();
+    SHOULD_NOT_BE_CHUNKING_STRING();
+    container->isExpectingName = true;
+
+    if(value <= INTSMALL_POSITIVE_EDGE)
+    {
+        // Small Int
+        return addByte(ctx, (uint8_t)value);
+    }
+
+    size_t byteCount = 1;
+    for(uint64_t v = value >> 8; v != 0; v >>= 8)
+    {
+        byteCount++;
+    }
+
+    // If the top bit isn't set, save as a signed int
+    uint8_t typeCode = ((value >> (byteCount*8-1)) == 0) ? TYPE_SINT8 : TYPE_UINT8;
+    return encodeIntegerType(ctx, typeCode, value, byteCount);
+}
+
+ksbonjson_encodeStatus ksbonjson_addSignedInteger(KSBONJSONEncodeContext* const ctx, const int64_t value)
+{
+    if(value >= 0)
+    {
+        return ksbonjson_addUnsignedInteger(ctx, (uint64_t)value);
+    }
+
+    KSBONJSONContainerState* const container = &ctx->containers[ctx->containerDepth];
+    SHOULD_NOT_BE_EXPECTING_OBJECT_NAME();
+    SHOULD_NOT_BE_CHUNKING_STRING();
+    container->isExpectingName = true;
+
+    if(value >= INTSMALL_NEGATIVE_EDGE)
+    {
+        // Small Int
+        return addByte(ctx, (uint8_t)value);
+    }
+
+    size_t byteCount = 1;
+    for(int64_t v = value >> 8; v != -1; v >>= 8)
+    {
+        byteCount++;
+    }
+    if((value << (64 - byteCount * 8)) >= 0)
+    {
+        // Cutting off this 0xff byte would change the sign
+        byteCount++;
+    }
+    return encodeIntegerType(ctx, TYPE_SINT8, value, byteCount);
+}
+
 ksbonjson_encodeStatus ksbonjson_addFloat(KSBONJSONEncodeContext* const ctx, const double value)
 {
     const int64_t asInt = (int64_t)value;
     unlikely_if((double)asInt == value)
     {
-        return ksbonjson_addInteger(ctx, asInt);
+        return ksbonjson_addSignedInteger(ctx, asInt);
     }
 
     KSBONJSONContainerState* const container = &ctx->containers[ctx->containerDepth];
@@ -316,32 +370,6 @@ ksbonjson_encodeStatus ksbonjson_addFloat(KSBONJSONEncodeContext* const ctx, con
 #endif
 }
 
-ksbonjson_encodeStatus ksbonjson_addUInteger(KSBONJSONEncodeContext* const ctx, const uint64_t value)
-{
-    likely_if(value < 0x8000000000000000ULL)
-    {
-        return ksbonjson_addInteger(ctx, (int64_t)value);
-    }
-
-    KSBONJSONContainerState* const container = &ctx->containers[ctx->containerDepth];
-    SHOULD_NOT_BE_EXPECTING_OBJECT_NAME();
-    SHOULD_NOT_BE_CHUNKING_STRING();
-
-    container->isExpectingName = true;
-
-    // Allocate 2 unions to give scratch space in front of the encoded u64
-    union uint64_u u[2];
-    u[1].u64 = value;
-#if KSBONJSON_IS_LITTLE_ENDIAN
-    // The last byte of our scratch space will hold the type code
-    u[0].b[7] = TYPE_UINT64;
-    return addBytes(ctx, &u[0].b[7], 9);
-#else
-    uint8_t data[] = {TYPE_UINT64, u[1].b[7], u[1].b[6], u[1].b[5], u[1].b[4], u[1].b[3], u[1].b[2], u[1].b[1], u[1].b[0]};
-    return addBytes(ctx, data, sizeof(data));
-#endif
-}
-
 ksbonjson_encodeStatus ksbonjson_addNull(KSBONJSONEncodeContext* const ctx)
 {
     KSBONJSONContainerState* const container = &ctx->containers[ctx->containerDepth];
@@ -362,9 +390,19 @@ ksbonjson_encodeStatus ksbonjson_addString(KSBONJSONEncodeContext* const ctx,
 
     container->isExpectingName = !container->isExpectingName;
 
+    if(valueLength <= 15)
+    {
+        PROPAGATE_ERROR(addByte(ctx, TYPE_STRING0 + valueLength));
+        if(valueLength == 0)
+        {
+            return KSBONJSON_ENCODE_OK;
+        }
+        return addBytes(ctx, (uint8_t*)value, valueLength);
+    }
+
     PROPAGATE_ERROR(addByte(ctx, TYPE_STRING));
     PROPAGATE_ERROR(addBytes(ctx, (uint8_t*)value, valueLength));
-    return addByte(ctx, TYPE_STRING);
+    return addByte(ctx, STRING_TERMINATOR);
 }
 
 ksbonjson_encodeStatus ksbonjson_chunkString(KSBONJSONEncodeContext* const ctx,

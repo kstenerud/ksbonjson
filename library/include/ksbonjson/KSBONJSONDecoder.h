@@ -184,22 +184,22 @@ typedef struct KSBONJSONDecodeCallbacks
     ksbonjson_decodeStatus (*onBoolean)(bool value, void* userData);
 
     /**
-     * Called when an integer element value is decoded.
+     * Called when an unsigned integer element value is decoded.
      *
      * @param value The element's value.
      * @param userData Data that was specified when calling ksbonjson_decode().
      * @return KSBONJSON_DECODE_OK if decoding should continue.
      */
-    ksbonjson_decodeStatus (*onInteger)(int64_t value, void* userData);
+    ksbonjson_decodeStatus (*onUnsignedInteger)(uint64_t value, void* userData);
 
     /**
-     * Called when an integer element value is decoded.
+     * Called when a signed integer element value is decoded.
      *
      * @param value The element's value.
      * @param userData Data that was specified when calling ksbonjson_decode().
      * @return KSBONJSON_DECODE_OK if decoding should continue.
      */
-    ksbonjson_decodeStatus (*onUInteger)(uint64_t value, void* userData);
+    ksbonjson_decodeStatus (*onSignedInteger)(int64_t value, void* userData);
 
     /**
      * Called when a floating point element value is decoded.

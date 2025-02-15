@@ -254,11 +254,11 @@ static ksbonjson_encodeStatus parseJsonElement(json_object *obj, KSBONJSONEncode
             uint64_t asUint = json_object_get_uint64(obj);
             if(asInt >= 0 && asUint > (uint64_t)asInt)
             {
-                PROPAGATE_ENCODE_ERROR(ksbonjson_addUInteger(ctx, asUint));
+                PROPAGATE_ENCODE_ERROR(ksbonjson_addUnsignedInteger(ctx, asUint));
             }
             else
             {
-                PROPAGATE_ENCODE_ERROR(ksbonjson_addInteger(ctx, asInt));
+                PROPAGATE_ENCODE_ERROR(ksbonjson_addSignedInteger(ctx, asInt));
             }
             break;
         }
@@ -405,16 +405,16 @@ static ksbonjson_decodeStatus onBoolean(bool value, void* userData)
     return addObject(ctx, json_object_new_boolean(value));
 }
 
-static ksbonjson_decodeStatus onInteger(int64_t value, void* userData)
-{
-    DecoderContext* ctx = (DecoderContext*)userData;
-    return addObject(ctx, json_object_new_int64(value));
-}
-
-static ksbonjson_decodeStatus onUInteger(uint64_t value, void* userData)
+static ksbonjson_decodeStatus onUnsignedInteger(uint64_t value, void* userData)
 {
     DecoderContext* ctx = (DecoderContext*)userData;
     return addObject(ctx, json_object_new_uint64(value));
+}
+
+static ksbonjson_decodeStatus onSignedInteger(int64_t value, void* userData)
+{
+    DecoderContext* ctx = (DecoderContext*)userData;
+    return addObject(ctx, json_object_new_int64(value));
 }
 
 static ksbonjson_decodeStatus onFloat(double value, void* userData)
@@ -495,10 +495,10 @@ static void init_decoder_context(DecoderContext* ctx)
     ctx->callbacks.onEndContainer = onEndContainer;
     ctx->callbacks.onEndData = onEndData;
     ctx->callbacks.onFloat = onFloat;
-    ctx->callbacks.onInteger = onInteger;
+    ctx->callbacks.onUnsignedInteger = onUnsignedInteger;
+    ctx->callbacks.onSignedInteger = onSignedInteger;
     ctx->callbacks.onNull = onNull;
     ctx->callbacks.onString = onString;
-    ctx->callbacks.onUInteger = onUInteger;
 }
 
 static void bonjsonToJson(const char* const src_path, const char* const dst_path, bool prettyPrint)

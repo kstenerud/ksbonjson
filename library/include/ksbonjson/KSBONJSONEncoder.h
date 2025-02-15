@@ -241,23 +241,23 @@ KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_terminateDocument(KSBONJSONEnc
 KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addBoolean(KSBONJSONEncodeContext* context, bool value);
 
 /**
- * Add an integer element.
- *
- * @param context The encoding context.
- * @param value The element's value.
- * @return KSBONJSON_ENCODER_OK if the process was successful.
- */
-KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addInteger(KSBONJSONEncodeContext* context, int64_t value);
-
-/**
  * Add an unsigned integer element.
  *
  * @param context The encoding context.
  * @param value The element's value.
  * @return KSBONJSON_ENCODER_OK if the process was successful.
  */
-KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addUInteger(KSBONJSONEncodeContext* context, uint64_t value);
-    
+KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addUnsignedInteger(KSBONJSONEncodeContext* context, uint64_t value);
+
+/**
+ * Add a signed integer element.
+ *
+ * @param context The encoding context.
+ * @param value The element's value.
+ * @return KSBONJSON_ENCODER_OK if the process was successful.
+ */
+KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addSignedInteger(KSBONJSONEncodeContext* context, int64_t value);
+
 /**
  * Add a floating point element.
  *
