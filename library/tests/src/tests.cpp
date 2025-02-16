@@ -491,11 +491,15 @@ TEST(EncodeDecode, float16)
 TEST(EncodeDecode, float32)
 {
     assert_encode_decode({std::make_shared<FloatEvent>(0x1.3f7p5)}, {TYPE_FLOAT32, 0x00, 0xb8, 0x1f, 0x42});
+
+    assert_decode({TYPE_FLOAT32, 0x00, 0x00, 0x90, 0x3f}, {std::make_shared<FloatEvent>(1.125)});
 }
 
 TEST(EncodeDecode, float64)
 {
     assert_encode_decode({std::make_shared<FloatEvent>(1.234)}, {TYPE_FLOAT64, 0x58, 0x39, 0xb4, 0xc8, 0x76, 0xbe, 0xf3, 0x3f});
+
+    assert_decode({TYPE_FLOAT64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf2, 0x3f}, {std::make_shared<FloatEvent>(1.125)});
 }
 
 TEST(EncodeDecode, smallint)
