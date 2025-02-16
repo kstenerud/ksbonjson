@@ -856,22 +856,6 @@ TEST(Encoder, object_name)
         TYPE_END,
     });
 
-    // assert_encode_decode(
-    // {
-    //     std::make_shared<ObjectBeginEvent>(),
-    //         std::make_shared<StringChunkEvent>("a", CHUNK_HAS_NEXT),
-    //         std::make_shared<StringChunkEvent>("bc", CHUNK_HAS_NEXT),
-    //         std::make_shared<StringChunkEvent>("d", CHUNK_LAST),
-    //         std::make_shared<IntegerEvent>(1LL),
-    //     std::make_shared<ContainerEndEvent>(),
-    // },
-    // {
-    //     0x92,
-    //         0x90, 0x03, 0x61, 0x05, 0x62, 0x63, 0x02, 0x64,
-    //         0x01,
-    //     0x93,
-    // });
-
     // Non-string is not allowed in the name field
 
     assert_encode_failure(
@@ -1102,27 +1086,6 @@ TEST(Encoder, object_value)
             1,
         TYPE_END,
     });
-
-    // assert_encode_decode(
-    // {
-    //     std::make_shared<ObjectBeginEvent>(),
-    //         std::make_shared<StringEvent>("a"),
-    //         std::make_shared<StringChunkEvent>("b", CHUNK_HAS_NEXT),
-    //         std::make_shared<StringChunkEvent>("c", CHUNK_HAS_NEXT),
-    //         std::make_shared<StringChunkEvent>("d", CHUNK_HAS_NEXT),
-    //         std::make_shared<StringChunkEvent>("e", CHUNK_LAST),
-    //         std::make_shared<StringEvent>("z"),
-    //         std::make_shared<IntegerEvent>(1LL),
-    //     std::make_shared<ContainerEndEvent>(),
-    // },
-    // {
-    //     TYPE_OBJECT,
-    //         0x71, 0x61,
-    //         0x90, 0x03, 0x62, 0x03, 0x63, 0x03, 0x64, 0x02, 0x65,
-    //         0x71, 0x7a,
-    //         0x01,
-    //     TYPE_END,
-    // });
 
     assert_encode_decode(
     {
