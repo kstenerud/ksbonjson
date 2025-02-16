@@ -243,7 +243,7 @@ static ksbonjson_encodeStatus encodeIntegerType(KSBONJSONEncodeContext* const ct
 #else
     uint8_t data[byteCount + 1];
     data[0] = typeCode + byteCount - 1;
-    for(int i = 0; i < byteCount; i++)
+    for(size_t i = 0; i < byteCount; i++)
     {
         data[byteCount - i] = u[1].b[i];
     }

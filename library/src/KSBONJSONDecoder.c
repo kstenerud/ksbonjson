@@ -202,8 +202,8 @@ static uint64_t decodeUnsignedInt(DecodeContext* const ctx, const int size)
     }
     const uint8_t* const buf = ctx->bufferCurrent;
     ctx->bufferCurrent += size;
-    union uint64_u u = {.u64 = 0};
 #if KSBONJSON_IS_LITTLE_ENDIAN
+    union uint64_u u = {.u64 = 0};
     memcpy(u.b, buf, size);
 #else
     union uint64_u u = {.u64 = buf[0]};
@@ -225,8 +225,8 @@ static int64_t decodeSignedInt(DecodeContext* const ctx, const int size)
     const uint8_t* const buf = ctx->bufferCurrent;
     ctx->bufferCurrent += size;
     // Use the highest byte to sign-extend init the int64
-    union int64_u u = {.i64 = (int8_t)buf[size-1]};
 #if KSBONJSON_IS_LITTLE_ENDIAN
+    union int64_u u = {.i64 = (int8_t)buf[size-1]};
     memcpy(u.b, buf, size);
 #else
     // Use the highest byte to sign-extend init the int64
