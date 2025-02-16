@@ -193,9 +193,13 @@ static ksbonjson_decodeStatus decodeUleb128(DecodeContext* const ctx, uint64_t* 
     return KSBONJSON_DECODE_OK;
 }
 
-static ksbonjson_decodeStatus decodeAndReportUnsignedInteger(DecodeContext* const ctx, const int size)
+static uint64_t decodeUnsignedInt(DecodeContext* const ctx, const int size)
 {
-    SHOULD_HAVE_ROOM_FOR_BYTES(size);
+    // It's expected that you've already called SHOULD_HAVE_ROOM_FOR_BYTES()
+    if(size == 0)
+    {
+        return 0;
+    }
     const uint8_t* const buf = ctx->bufferCurrent;
     ctx->bufferCurrent += size;
     union uint64_u u = {.u64 = 0};
@@ -208,12 +212,16 @@ static ksbonjson_decodeStatus decodeAndReportUnsignedInteger(DecodeContext* cons
         u.b[i] = buf[(size-1) - i];
     }
 #endif
-    return ctx->callbacks->onUnsignedInteger(u.u64, ctx->userData);
+    return u.u64;
 }
 
-static ksbonjson_decodeStatus decodeAndReportSignedInteger(DecodeContext* const ctx, const int size)
+static int64_t decodeSignedInt(DecodeContext* const ctx, const int size)
 {
-    SHOULD_HAVE_ROOM_FOR_BYTES(size);
+    // It's expected that you've already called SHOULD_HAVE_ROOM_FOR_BYTES()
+    if(size == 0)
+    {
+        return 0;
+    }
     const uint8_t* const buf = ctx->bufferCurrent;
     ctx->bufferCurrent += size;
     // Use the highest byte to sign-extend init the int64
@@ -228,7 +236,21 @@ static ksbonjson_decodeStatus decodeAndReportSignedInteger(DecodeContext* const 
         u.b[i] = buf[(size-1) - i];
     }
 #endif
-    return ctx->callbacks->onSignedInteger(u.i64, ctx->userData);
+    return u.i64;
+}
+
+static ksbonjson_decodeStatus decodeAndReportUnsignedInteger(DecodeContext* const ctx, const int size)
+{
+    SHOULD_HAVE_ROOM_FOR_BYTES(size);
+    uint64_t value = decodeUnsignedInt(ctx, size);
+    return ctx->callbacks->onUnsignedInteger(value, ctx->userData);
+}
+
+static ksbonjson_decodeStatus decodeAndReportSignedInteger(DecodeContext* const ctx, const int size)
+{
+    SHOULD_HAVE_ROOM_FOR_BYTES(size);
+    int64_t value = decodeSignedInt(ctx, size);
+    return ctx->callbacks->onSignedInteger(value, ctx->userData);
 }
 
 static ksbonjson_decodeStatus decodeAndReportFloat16(DecodeContext* const ctx)
@@ -292,32 +314,19 @@ static ksbonjson_decodeStatus decodeAndReportBigNumber(DecodeContext* const ctx)
     }
     SHOULD_HAVE_ROOM_FOR_BYTES(significandLength + exponentLength);
 
-    uint64_t significandPortion = 0;
-    const uint8_t* buffer = ctx->bufferCurrent;
-    for(int i = (int)significandLength - 1; i >= 0; i--)
-    {
-        significandPortion <<= 8;
-        significandPortion |= buffer[i];
-    }
-    ctx->bufferCurrent += significandLength;
-
+    uint64_t significandPortion = decodeUnsignedInt(ctx, significandLength);
     unlikely_if(significandPortion > 0x8000000000000000ULL)
     {
         return KSBONJSON_DECODE_TOO_BIG;
     }
-
-    uint64_t exponentPortion = 0;
-    buffer = ctx->bufferCurrent;
-    for(int i = exponentLength - 1; i >= 0; i--)
-    {
-        exponentPortion <<= 8;
-        exponentPortion |= buffer[i];
-    }
-    ctx->bufferCurrent += exponentLength;
-
     int64_t significand = isNegative ? -(int64_t)significandPortion : (int64_t)significandPortion;
-    // TODO: handle exponent, also exponent is signed
-    // int exponent = exponentPortion;
+
+    int64_t exponent = decodeSignedInt(ctx, exponentLength);
+    unlikely_if(exponent != 0)
+    {
+        // TODO: handle exponent
+        return KSBONJSON_DECODE_TOO_BIG;
+    }
 
     return ctx->callbacks->onSignedInteger(significand, ctx->userData);
 }
