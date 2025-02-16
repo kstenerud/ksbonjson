@@ -161,6 +161,11 @@ typedef enum
     KSBONJSON_DECODE_EXPECTED_OBJECT_VALUE = 7,
 
     /**
+     * An element was successfully decoded, but contained invalid data.
+     */
+    KSBONJSON_DECODE_INVALID_DATA = 8,
+
+    /**
      * Generic error code that can be returned from a callback.
      *
      * More specific error codes (> 100) may also be defined by the user if needed.

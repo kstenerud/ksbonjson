@@ -25,6 +25,7 @@
 //
 
 #include <gtest/gtest.h>
+#include <math.h>
 #include <algorithm>
 
 #include <ksbonjson/KSBONJSONEncoder.h>
@@ -1410,7 +1411,7 @@ TEST(Encoder, failed_to_add)
     ASSERT_NE(KSBONJSON_ENCODE_OK, (*std::make_shared<IntegerEvent>(1LL))(&eContext));
 }
 
-TEST(Encoder, string_chunking)
+TEST(Encoder, fail_string_chunking)
 {
     assert_encode_failure(
     {
@@ -1449,7 +1450,7 @@ TEST(Encoder, string_chunking)
     });
 }
 
-TEST(Encoder, containers)
+TEST(Encoder, fail_containers)
 {
     assert_encode_failure(
     {
@@ -1560,16 +1561,23 @@ TEST(Decoder, unbalanced_containers)
     assert_decode_failure({TYPE_ARRAY, TYPE_OBJECT, TYPE_END});
 }
 
-TEST(Decoder, big_number)
+TEST(Decoder, fail_big_number)
 {
     assert_decode({TYPE_BIG_NUMBER, 0x02, 0x00}, {std::make_shared<UIntegerEvent>(0LL)});
 }
 
-TEST(Decoder, big_number_length_field)
+TEST(Decoder, fail_big_number_length_field)
 {
     assert_decode_failure({TYPE_BIG_NUMBER});
     assert_decode_failure({TYPE_BIG_NUMBER, 0x02});
-    // assert_decode_failure({0x96, 0x01, 0x00});
+}
+
+
+TEST(Decoder, fail_float)
+{
+    assert_encode_failure({std::make_shared<FloatEvent>(NAN)});
+    assert_encode_failure({std::make_shared<FloatEvent>(INFINITY)});
+    assert_encode_failure({std::make_shared<FloatEvent>(-INFINITY)});
 }
 
 

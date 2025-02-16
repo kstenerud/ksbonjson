@@ -253,6 +253,13 @@ static ksbonjson_decodeStatus decodeAndReportSignedInteger(DecodeContext* const 
     return ctx->callbacks->onSignedInteger(value, ctx->userData);
 }
 
+static bool isInfOrNan(double value)
+{
+    union float64_u u = {.f64 = value};
+    // When all exponent bits are set, it signifies an infinite or NaN value
+    return (u.u64 & 0x7ff0000000000000ULL) == 0x7ff0000000000000ULL;
+}
+
 static ksbonjson_decodeStatus decodeAndReportFloat16(DecodeContext* const ctx)
 {
     SHOULD_HAVE_ROOM_FOR_BYTES(2);
@@ -261,11 +268,14 @@ static ksbonjson_decodeStatus decodeAndReportFloat16(DecodeContext* const ctx)
 
 #if KSBONJSON_IS_LITTLE_ENDIAN
     union float32_u u = {.b = {0, 0, buf[0], buf[1]}};
-    return ctx->callbacks->onFloat(u.f32, ctx->userData);
 #else
     union float32_u u = {.b = {buf[1], buf[0], 0, 0}};
-    return ctx->callbacks->onFloat(u.f32, ctx->userData);
 #endif
+    if(isInfOrNan(u.f32))
+    {
+        return KSBONJSON_DECODE_INVALID_DATA;
+    }
+    return ctx->callbacks->onFloat(u.f32, ctx->userData);
 }
 
 static ksbonjson_decodeStatus decodeAndReportFloat32(DecodeContext* const ctx)
@@ -275,13 +285,16 @@ static ksbonjson_decodeStatus decodeAndReportFloat32(DecodeContext* const ctx)
     ctx->bufferCurrent += 4;
 
 #if KSBONJSON_IS_LITTLE_ENDIAN
-    float value;
-    memcpy(&value, buf, sizeof(value));
-    return ctx->callbacks->onFloat(value, ctx->userData);
+    union float32_u u;
+    memcpy(u.b, buf, sizeof(u));
 #else
     union float32_u u = {.b = {buf[3], buf[2], buf[1], buf[0]}};
-    return ctx->callbacks->onFloat(u.f32, ctx->userData);
 #endif
+    if(isInfOrNan(u.f32))
+    {
+        return KSBONJSON_DECODE_INVALID_DATA;
+    }
+    return ctx->callbacks->onFloat(u.f32, ctx->userData);
 }
 
 static ksbonjson_decodeStatus decodeAndReportFloat64(DecodeContext* const ctx)
@@ -291,13 +304,16 @@ static ksbonjson_decodeStatus decodeAndReportFloat64(DecodeContext* const ctx)
     ctx->bufferCurrent += 8;
 
 #if KSBONJSON_IS_LITTLE_ENDIAN
-    double value;
-    memcpy(&value, buf, sizeof(value));
-    return ctx->callbacks->onFloat(value, ctx->userData);
+    union float64_u u;
+    memcpy(u.b, buf, sizeof(u));
 #else
     union float64_u u = {.b = {buf[7], buf[6], buf[5], buf[4], buf[3], buf[2], buf[1], buf[0]}};
-    return ctx->callbacks->onFloat(u.f64, ctx->userData);
 #endif
+    if(isInfOrNan(u.f64))
+    {
+        return KSBONJSON_DECODE_INVALID_DATA;
+    }
+    return ctx->callbacks->onFloat(u.f64, ctx->userData);
 }
 
 static ksbonjson_decodeStatus decodeAndReportBigNumber(DecodeContext* const ctx)
