@@ -391,56 +391,55 @@ void assert_decode_failure(std::vector<uint8_t> document)
 
 enum
 {
-    TYPE_ARRAY = 0x91,
-    TYPE_OBJECT = 0x92,
-    TYPE_END = 0x93,
-    TYPE_FALSE = 0x94,
-    TYPE_TRUE = 0x95,
-    TYPE_NULL = 0x96,
-    TYPE_UINT8 = 0x70,
-    TYPE_UINT16 = 0x71,
-    TYPE_UINT24 = 0x72,
-    TYPE_UINT32 = 0x73,
-    TYPE_UINT40 = 0x74,
-    TYPE_UINT48 = 0x75,
-    TYPE_UINT56 = 0x76,
-    TYPE_UINT64 = 0x77,
-    TYPE_SINT8 = 0x78,
-    TYPE_SINT16 = 0x79,
-    TYPE_SINT24 = 0x7a,
-    TYPE_SINT32 = 0x7b,
-    TYPE_SINT40 = 0x7c,
-    TYPE_SINT48 = 0x7d,
-    TYPE_SINT56 = 0x7e,
-    TYPE_SINT64 = 0x7f,
-    TYPE_BIGPOSITIVE = 0x6e,
-    TYPE_BIGNEGATIVE = 0x6f,
-    TYPE_FLOAT16 = 0x6b,
-    TYPE_FLOAT32 = 0x6c,
-    TYPE_FLOAT64 = 0x6d,
-    TYPE_STRING = 0x90,
-    TYPE_STRING0 = 0x80,
-    TYPE_STRING1 = 0x81,
-    TYPE_STRING2 = 0x82,
-    TYPE_STRING3 = 0x83,
-    TYPE_STRING4 = 0x84,
-    TYPE_STRING5 = 0x85,
-    TYPE_STRING6 = 0x86,
-    TYPE_STRING7 = 0x87,
-    TYPE_STRING8 = 0x88,
-    TYPE_STRING9 = 0x89,
-    TYPE_STRING10 = 0x8a,
-    TYPE_STRING11 = 0x8b,
-    TYPE_STRING12 = 0x8c,
-    TYPE_STRING13 = 0x8d,
-    TYPE_STRING14 = 0x8e,
-    TYPE_STRING15 = 0x8f,
+    TYPE_FLOAT16    = 0x6b,
+    TYPE_FLOAT32    = 0x6c,
+    TYPE_FLOAT64    = 0x6d,
+    TYPE_FALSE      = 0x6e,
+    TYPE_TRUE       = 0x6f,
+    TYPE_UINT8      = 0x70,
+    TYPE_UINT16     = 0x71,
+    TYPE_UINT24     = 0x72,
+    TYPE_UINT32     = 0x73,
+    TYPE_UINT40     = 0x74,
+    TYPE_UINT48     = 0x75,
+    TYPE_UINT56     = 0x76,
+    TYPE_UINT64     = 0x77,
+    TYPE_SINT8      = 0x78,
+    TYPE_SINT16     = 0x79,
+    TYPE_SINT24     = 0x7a,
+    TYPE_SINT32     = 0x7b,
+    TYPE_SINT40     = 0x7c,
+    TYPE_SINT48     = 0x7d,
+    TYPE_SINT56     = 0x7e,
+    TYPE_SINT64     = 0x7f,
+    TYPE_STRING0    = 0x80,
+    TYPE_STRING1    = 0x81,
+    TYPE_STRING2    = 0x82,
+    TYPE_STRING3    = 0x83,
+    TYPE_STRING4    = 0x84,
+    TYPE_STRING5    = 0x85,
+    TYPE_STRING6    = 0x86,
+    TYPE_STRING7    = 0x87,
+    TYPE_STRING8    = 0x88,
+    TYPE_STRING9    = 0x89,
+    TYPE_STRING10   = 0x8a,
+    TYPE_STRING11   = 0x8b,
+    TYPE_STRING12   = 0x8c,
+    TYPE_STRING13   = 0x8d,
+    TYPE_STRING14   = 0x8e,
+    TYPE_STRING15   = 0x8f,
+    TYPE_STRING     = 0x90,
+    TYPE_BIG_NUMBER = 0x91,
+    TYPE_ARRAY      = 0x92,
+    TYPE_OBJECT     = 0x93,
+    TYPE_END        = 0x94,
+    TYPE_NULL       = 0x95,
 };
 
 enum
 {
     STRING_TERMINATOR = 0xff,
-    INTSMALL_NEGATIVE_EDGE = (unsigned char)-105,
+    INTSMALL_NEGATIVE_EDGE = (unsigned char)-106,
     INTSMALL_POSITIVE_EDGE = 106,
 };
 
@@ -484,7 +483,7 @@ TEST(EncodeDecode, smallint)
     assert_encode_decode({std::make_shared<IntegerEvent>(  -1)}, {(uint8_t)  -1});
     assert_encode_decode({std::make_shared<IntegerEvent>( -60)}, {(uint8_t) -60});
     assert_encode_decode({std::make_shared<IntegerEvent>(-100)}, {(uint8_t)-100});
-    assert_encode_decode({std::make_shared<IntegerEvent>(-105)}, {(uint8_t)-105});
+    assert_encode_decode({std::make_shared<IntegerEvent>(-106)}, {(uint8_t)-106});
 }
 
 TEST(EncodeDecode, int8)
@@ -498,7 +497,7 @@ TEST(EncodeDecode, int8)
     assert_encode_decode({std::make_shared<IntegerEvent>( 200)}, {TYPE_UINT8, (uint8_t)( 200)}); 
     assert_encode_decode({std::make_shared<IntegerEvent>( 255)}, {TYPE_UINT8, (uint8_t)( 255)}); 
 
-    assert_encode_decode({std::make_shared<IntegerEvent>(-106)}, {TYPE_SINT8, (uint8_t)(-106)});
+    assert_encode_decode({std::make_shared<IntegerEvent>(-107)}, {TYPE_SINT8, (uint8_t)(-107)});
     assert_encode_decode({std::make_shared<IntegerEvent>(-121)}, {TYPE_SINT8, (uint8_t)(-121)});
     assert_encode_decode({std::make_shared<IntegerEvent>(-123)}, {TYPE_SINT8, (uint8_t)(-123)});
     assert_encode_decode({std::make_shared<IntegerEvent>(-127)}, {TYPE_SINT8, (uint8_t)(-127)});
@@ -1563,14 +1562,13 @@ TEST(Decoder, unbalanced_containers)
 
 TEST(Decoder, big_number)
 {
-    assert_decode({TYPE_BIGPOSITIVE, 0x01, 0x00}, {std::make_shared<UIntegerEvent>(0LL)});
+    assert_decode({TYPE_BIG_NUMBER, 0x02, 0x00}, {std::make_shared<UIntegerEvent>(0LL)});
 }
 
 TEST(Decoder, big_number_length_field)
 {
-    assert_decode_failure({TYPE_BIGPOSITIVE});
-    assert_decode_failure({TYPE_BIGPOSITIVE, 0x01});
-    assert_decode_failure({TYPE_BIGPOSITIVE, 0x01});
+    assert_decode_failure({TYPE_BIG_NUMBER});
+    assert_decode_failure({TYPE_BIG_NUMBER, 0x02});
     // assert_decode_failure({0x96, 0x01, 0x00});
 }
 
@@ -1626,11 +1624,11 @@ TEST(Examples, specification)
         std::make_shared<ContainerEndEvent>(),
     },
     {
-        0x91,
+        0x92,
             0x81, 0x61,
             0x01,
-            0x96,
-        0x93,
+            0x95,
+        0x94,
     });
 
     // Object
@@ -1644,20 +1642,20 @@ TEST(Examples, specification)
         std::make_shared<ContainerEndEvent>(),
     },
     {
-        0x92,
+        0x93,
             0x81, 0x62,
             0x00,
             0x84, 0x74, 0x65, 0x73, 0x74,
             0x81, 0x78,
-        0x93,
+        0x94,
     });
 
     // Boolean
-    assert_encode_decode({std::make_shared<BooleanEvent>(false)}, {0x94});
-    assert_encode_decode({std::make_shared<BooleanEvent>(true)}, {0x95});
+    assert_encode_decode({std::make_shared<BooleanEvent>(false)}, {0x6e});
+    assert_encode_decode({std::make_shared<BooleanEvent>(true)}, {0x6f});
 
     // Null
-    assert_encode_decode({std::make_shared<NullEvent>()}, {0x96});
+    assert_encode_decode({std::make_shared<NullEvent>()}, {0x95});
 
     // Full Example
     assert_encode_decode(
@@ -1685,21 +1683,21 @@ TEST(Examples, specification)
         std::make_shared<ContainerEndEvent>(),
     },
     {
-        0x92,
+        0x93,
             0x88, 0x61, 0x20, 0x6e, 0x75, 0x6d, 0x62, 0x65, 0x72,
             0x01,
             0x88, 0x61, 0x6e, 0x20, 0x61, 0x72, 0x72, 0x61, 0x79,
-            0x91,
+            0x92,
                 0x81, 0x78,
                 0x79, 0xe8, 0x03,
                 0x6b, 0xc0, 0x3f,
-            0x93,
+            0x94,
             0x86, 0x61, 0x20, 0x6e, 0x75, 0x6c, 0x6c,
-            0x96,
-            0x89, 0x61, 0x20, 0x62, 0x6f, 0x6f, 0x6c, 0x65, 0x61, 0x6e,
             0x95,
+            0x89, 0x61, 0x20, 0x62, 0x6f, 0x6f, 0x6c, 0x65, 0x61, 0x6e,
+            0x6f,
             0x89, 0x61, 0x6e, 0x20, 0x6f, 0x62, 0x6a, 0x65, 0x63, 0x74,
-            0x92,
+            0x93,
                 0x81, 0x61,
                 0x9c,
                 0x81, 0x62,
@@ -1709,7 +1707,7 @@ TEST(Examples, specification)
                       0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e,
                       0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e,
                 0xff,
-            0x93,
-        0x93,
+            0x94,
+        0x94,
     });
 }

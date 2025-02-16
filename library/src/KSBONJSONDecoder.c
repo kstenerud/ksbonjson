@@ -39,56 +39,55 @@
 
 enum
 {
-    TYPE_ARRAY = 0x91,
-    TYPE_OBJECT = 0x92,
-    TYPE_END = 0x93,
-    TYPE_FALSE = 0x94,
-    TYPE_TRUE = 0x95,
-    TYPE_NULL = 0x96,
-    TYPE_UINT8 = 0x70,
-    TYPE_UINT16 = 0x71,
-    TYPE_UINT24 = 0x72,
-    TYPE_UINT32 = 0x73,
-    TYPE_UINT40 = 0x74,
-    TYPE_UINT48 = 0x75,
-    TYPE_UINT56 = 0x76,
-    TYPE_UINT64 = 0x77,
-    TYPE_SINT8 = 0x78,
-    TYPE_SINT16 = 0x79,
-    TYPE_SINT24 = 0x7a,
-    TYPE_SINT32 = 0x7b,
-    TYPE_SINT40 = 0x7c,
-    TYPE_SINT48 = 0x7d,
-    TYPE_SINT56 = 0x7e,
-    TYPE_SINT64 = 0x7f,
-    TYPE_BIGPOSITIVE = 0x6e,
-    TYPE_BIGNEGATIVE = 0x6f,
-    TYPE_FLOAT16 = 0x6b,
-    TYPE_FLOAT32 = 0x6c,
-    TYPE_FLOAT64 = 0x6d,
-    TYPE_STRING = 0x90,
-    TYPE_STRING0 = 0x80,
-    TYPE_STRING1 = 0x81,
-    TYPE_STRING2 = 0x82,
-    TYPE_STRING3 = 0x83,
-    TYPE_STRING4 = 0x84,
-    TYPE_STRING5 = 0x85,
-    TYPE_STRING6 = 0x86,
-    TYPE_STRING7 = 0x87,
-    TYPE_STRING8 = 0x88,
-    TYPE_STRING9 = 0x89,
-    TYPE_STRING10 = 0x8a,
-    TYPE_STRING11 = 0x8b,
-    TYPE_STRING12 = 0x8c,
-    TYPE_STRING13 = 0x8d,
-    TYPE_STRING14 = 0x8e,
-    TYPE_STRING15 = 0x8f,
+    TYPE_FLOAT16    = 0x6b,
+    TYPE_FLOAT32    = 0x6c,
+    TYPE_FLOAT64    = 0x6d,
+    TYPE_FALSE      = 0x6e,
+    TYPE_TRUE       = 0x6f,
+    TYPE_UINT8      = 0x70,
+    TYPE_UINT16     = 0x71,
+    TYPE_UINT24     = 0x72,
+    TYPE_UINT32     = 0x73,
+    TYPE_UINT40     = 0x74,
+    TYPE_UINT48     = 0x75,
+    TYPE_UINT56     = 0x76,
+    TYPE_UINT64     = 0x77,
+    TYPE_SINT8      = 0x78,
+    TYPE_SINT16     = 0x79,
+    TYPE_SINT24     = 0x7a,
+    TYPE_SINT32     = 0x7b,
+    TYPE_SINT40     = 0x7c,
+    TYPE_SINT48     = 0x7d,
+    TYPE_SINT56     = 0x7e,
+    TYPE_SINT64     = 0x7f,
+    TYPE_STRING0    = 0x80,
+    TYPE_STRING1    = 0x81,
+    TYPE_STRING2    = 0x82,
+    TYPE_STRING3    = 0x83,
+    TYPE_STRING4    = 0x84,
+    TYPE_STRING5    = 0x85,
+    TYPE_STRING6    = 0x86,
+    TYPE_STRING7    = 0x87,
+    TYPE_STRING8    = 0x88,
+    TYPE_STRING9    = 0x89,
+    TYPE_STRING10   = 0x8a,
+    TYPE_STRING11   = 0x8b,
+    TYPE_STRING12   = 0x8c,
+    TYPE_STRING13   = 0x8d,
+    TYPE_STRING14   = 0x8e,
+    TYPE_STRING15   = 0x8f,
+    TYPE_STRING     = 0x90,
+    TYPE_BIG_NUMBER = 0x91,
+    TYPE_ARRAY      = 0x92,
+    TYPE_OBJECT     = 0x93,
+    TYPE_END        = 0x94,
+    TYPE_NULL       = 0x95,
 };
 
 enum
 {
     STRING_TERMINATOR = 0xff,
-    INTSMALL_NEGATIVE_EDGE = (unsigned char)-105,
+    INTSMALL_NEGATIVE_EDGE = (unsigned char)-106,
     INTSMALL_POSITIVE_EDGE = 106,
 };
 
@@ -194,44 +193,6 @@ static ksbonjson_decodeStatus decodeUleb128(DecodeContext* const ctx, uint64_t* 
     return KSBONJSON_DECODE_OK;
 }
 
-static ksbonjson_decodeStatus decodeBigNumber(DecodeContext* const ctx,
-                                              uint64_t* const pSignificand, 
-                                              int* const pExponent)
-{
-    uint64_t header = 0;
-    PROPAGATE_ERROR(ctx, decodeUleb128(ctx, &header));
-    const int exponentLength = header & 3;
-    const uint64_t significandLength = header >> 2;
-
-    unlikely_if(significandLength > 8)
-    {
-        return KSBONJSON_DECODE_TOO_BIG;
-    }
-    SHOULD_HAVE_ROOM_FOR_BYTES(significandLength + exponentLength);
-
-    uint64_t significand = 0;
-    const uint8_t* buffer = ctx->bufferCurrent;
-    for(int i = (int)significandLength - 1; i >= 0; i--)
-    {
-        significand <<= 8;
-        significand |= buffer[i];
-    }
-    ctx->bufferCurrent += significandLength;
-
-    uint64_t exponent = 0;
-    buffer = ctx->bufferCurrent;
-    for(int i = exponentLength - 1; i >= 0; i--)
-    {
-        exponent <<= 8;
-        exponent |= buffer[i];
-    }
-    ctx->bufferCurrent += exponentLength;
-
-    *pSignificand = significand;
-    *pExponent = exponent;
-    return KSBONJSON_DECODE_OK;
-}
-
 static ksbonjson_decodeStatus decodeAndReportUnsignedInteger(DecodeContext* const ctx, const int size)
 {
     SHOULD_HAVE_ROOM_FOR_BYTES(size);
@@ -317,25 +278,47 @@ static ksbonjson_decodeStatus decodeAndReportFloat64(DecodeContext* const ctx)
 #endif
 }
 
-static ksbonjson_decodeStatus decodeAndReportPositiveBigNumber(DecodeContext* const ctx)
+static ksbonjson_decodeStatus decodeAndReportBigNumber(DecodeContext* const ctx)
 {
-    uint64_t significand = 0;
-    int exponent = 0;
-    PROPAGATE_ERROR(ctx, decodeBigNumber(ctx, &significand, &exponent));
-    // TODO: handle exponent
-    return ctx->callbacks->onUnsignedInteger(significand, ctx->userData);
-}
+    uint64_t header = 0;
+    PROPAGATE_ERROR(ctx, decodeUleb128(ctx, &header));
+    const bool isNegative = (header & 1) != 0;
+    const int exponentLength = (header & 6) >> 1;
+    const uint64_t significandLength = header >> 3;
 
-static ksbonjson_decodeStatus decodeAndReportNegativeBigNumber(DecodeContext* const ctx)
-{
-    uint64_t significand = 0;
-    int exponent = 0;
-    PROPAGATE_ERROR(ctx, decodeBigNumber(ctx, &significand, &exponent));
-    // TODO: handle exponent
-    unlikely_if(significand > 0x8000000000000000ULL)
+    unlikely_if(significandLength > 8)
     {
         return KSBONJSON_DECODE_TOO_BIG;
     }
+    SHOULD_HAVE_ROOM_FOR_BYTES(significandLength + exponentLength);
+
+    uint64_t significandPortion = 0;
+    const uint8_t* buffer = ctx->bufferCurrent;
+    for(int i = (int)significandLength - 1; i >= 0; i--)
+    {
+        significandPortion <<= 8;
+        significandPortion |= buffer[i];
+    }
+    ctx->bufferCurrent += significandLength;
+
+    unlikely_if(significandPortion > 0x8000000000000000ULL)
+    {
+        return KSBONJSON_DECODE_TOO_BIG;
+    }
+
+    uint64_t exponentPortion = 0;
+    buffer = ctx->bufferCurrent;
+    for(int i = exponentLength - 1; i >= 0; i--)
+    {
+        exponentPortion <<= 8;
+        exponentPortion |= buffer[i];
+    }
+    ctx->bufferCurrent += exponentLength;
+
+    int64_t significand = isNegative ? -(int64_t)significandPortion : (int64_t)significandPortion;
+    // TODO: handle exponent, also exponent is signed
+    // int exponent = exponentPortion;
+
     return ctx->callbacks->onSignedInteger(significand, ctx->userData);
 }
 
@@ -503,11 +486,8 @@ static ksbonjson_decodeStatus decodeValue(DecodeContext* const ctx, uint8_t type
         case TYPE_FLOAT64:
             PROPAGATE_ERROR(ctx, decodeAndReportFloat64(ctx));
             break;
-        case TYPE_BIGPOSITIVE:
-            PROPAGATE_ERROR(ctx, decodeAndReportPositiveBigNumber(ctx));
-            break;
-        case TYPE_BIGNEGATIVE:
-            PROPAGATE_ERROR(ctx, decodeAndReportNegativeBigNumber(ctx));
+        case TYPE_BIG_NUMBER:
+            PROPAGATE_ERROR(ctx, decodeAndReportBigNumber(ctx));
             break;
         case TYPE_ARRAY:
             PROPAGATE_ERROR(ctx, beginArray(ctx));
