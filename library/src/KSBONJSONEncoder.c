@@ -426,7 +426,7 @@ ksbonjson_encodeStatus ksbonjson_chunkString(KSBONJSONEncodeContext* const ctx,
 
     container->isChunkingString = false;
     container->isExpectingName = !container->isExpectingName;
-    return addByte(ctx, TYPE_STRING);
+    return addByte(ctx, STRING_TERMINATOR);
 }
 
 ksbonjson_encodeStatus ksbonjson_addBONJSONDocument(KSBONJSONEncodeContext* const ctx,

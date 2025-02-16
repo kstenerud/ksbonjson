@@ -333,6 +333,30 @@ void assert_encode_decode(std::vector<std::shared_ptr<Event>> events, std::vecto
     ASSERT_EQ(expected_encoded, actual_encoded);
 }
 
+void assert_encode(std::vector<std::shared_ptr<Event>> events, std::vector<uint8_t> expected_encoded)
+{
+    if(REPORT_ENCODING)
+    {
+        printf("\n[assert_encode]\n");
+    }
+
+    // Encode
+    if(REPORT_ENCODING)
+    {
+        printf("\n[assert_encode]: Encode\n");
+    }
+    KSBONJSONEncodeContext eContext;
+    EncoderContext eCtx(10000);
+    ksbonjson_beginEncode(&eContext, addEncodedDataCallback, &eCtx);
+    for (const std::shared_ptr<Event>& event: events)
+    {
+        ASSERT_EQ(KSBONJSON_ENCODE_OK, (*event)(&eContext));
+    }
+    ASSERT_EQ(KSBONJSON_ENCODE_OK, ksbonjson_endEncode(&eContext));
+    std::vector<uint8_t> actual_encoded = eCtx.get();
+    ASSERT_EQ(expected_encoded, actual_encoded);
+}
+
 void assert_decode(std::vector<uint8_t> document, std::vector<std::shared_ptr<Event>> expected_events)
 {
     if(REPORT_ENCODING || REPORT_DECODING)
@@ -1307,26 +1331,26 @@ TEST(Encoder, array_value)
         TYPE_END,
     });
 
-    // assert_encode_decode(
-    // {
-    //     std::make_shared<ArrayBeginEvent>(),
-    //         std::make_shared<StringEvent>("a"),
-    //         std::make_shared<StringChunkEvent>("b", CHUNK_HAS_NEXT),
-    //         std::make_shared<StringChunkEvent>("c", CHUNK_HAS_NEXT),
-    //         std::make_shared<StringChunkEvent>("d", CHUNK_HAS_NEXT),
-    //         std::make_shared<StringChunkEvent>("e", CHUNK_LAST),
-    //         std::make_shared<StringEvent>("z"),
-    //         std::make_shared<IntegerEvent>(1LL),
-    //     std::make_shared<ContainerEndEvent>(),
-    // },
-    // {
-    //     TYPE_ARRAY,
-    //         0x71, 0x61,
-    //         0x90, 0x03, 0x62, 0x03, 0x63, 0x03, 0x64, 0x02, 0x65,
-    //         0x71, 0x7a,
-    //         0x01,
-    //     TYPE_END,
-    // });
+    assert_encode(
+    {
+        std::make_shared<ArrayBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
+            std::make_shared<StringChunkEvent>("b", CHUNK_HAS_NEXT),
+            std::make_shared<StringChunkEvent>("cdefg", CHUNK_HAS_NEXT),
+            std::make_shared<StringChunkEvent>("h", CHUNK_HAS_NEXT),
+            std::make_shared<StringChunkEvent>("i", CHUNK_LAST),
+            std::make_shared<StringEvent>("z"),
+            std::make_shared<IntegerEvent>(1LL),
+        std::make_shared<ContainerEndEvent>(),
+    },
+    {
+        TYPE_ARRAY,
+            TYPE_STRING1, 'a',
+            TYPE_STRING, 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', STRING_TERMINATOR,
+            TYPE_STRING1, 'z',
+            0x01,
+        TYPE_END,
+    });
 
     assert_encode_decode(
     {
