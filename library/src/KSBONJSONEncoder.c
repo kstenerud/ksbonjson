@@ -27,10 +27,55 @@
 #include <ksbonjson/KSBONJSONEncoder.h>
 #include <stddef.h>
 
+#pragma GCC diagnostic ignored "-Wfloat-equal"
+
 
 // ============================================================================
 // Helpers
 // ============================================================================
+
+/**
+ * Best-effort attempt to get the endianness of the machine being compiled for.
+ * If this fails, you will have to define it manually.
+ *
+ * Shamelessly stolen from https://github.com/Tencent/rapidjson/blob/master/include/rapidjson/rapidjson.h
+ */
+#ifndef KSBONJSON_IS_LITTLE_ENDIAN
+// Detect with GCC 4.6's macro
+#  ifdef __BYTE_ORDER__
+#    if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#      define KSBONJSON_IS_LITTLE_ENDIAN 1
+#    elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#      define KSBONJSON_IS_LITTLE_ENDIAN 0
+#    else
+#      error Unknown machine endianness detected. User needs to define KSBONJSON_IS_LITTLE_ENDIAN.
+#    endif // __BYTE_ORDER__
+// Detect with GLIBC's endian.h
+#  elif defined(__GLIBC__)
+#    include <endian.h>
+#    if (__BYTE_ORDER == __LITTLE_ENDIAN)
+#      define KSBONJSON_IS_LITTLE_ENDIAN 1
+#    elif (__BYTE_ORDER == __BIG_ENDIAN)
+#      define KSBONJSON_IS_LITTLE_ENDIAN 0
+#    else
+#      error Unknown machine endianness detected. User needs to define KSBONJSON_IS_LITTLE_ENDIAN.
+#   endif // __GLIBC__
+// Detect with _LITTLE_ENDIAN and _BIG_ENDIAN macro
+#  elif defined(_LITTLE_ENDIAN) && !defined(_BIG_ENDIAN)
+#    define KSBONJSON_IS_LITTLE_ENDIAN 1
+#  elif defined(_BIG_ENDIAN) && !defined(_LITTLE_ENDIAN)
+#    define KSBONJSON_IS_LITTLE_ENDIAN 0
+// Detect with architecture macros
+#  elif defined(__sparc) || defined(__sparc__) || defined(_POWER) || defined(__powerpc__) || defined(__ppc__) || defined(__ppc64__) || defined(__hpux) || defined(__hppa) || defined(_MIPSEB) || defined(_POWER) || defined(__s390__)
+#    define KSBONJSON_IS_LITTLE_ENDIAN 0
+#  elif defined(__i386__) || defined(__alpha__) || defined(__ia64) || defined(__ia64__) || defined(_M_IX86) || defined(_M_IA64) || defined(_M_ALPHA) || defined(__amd64) || defined(__amd64__) || defined(_M_AMD64) || defined(__x86_64) || defined(__x86_64__) || defined(_M_X64) || defined(__bfin__)
+#    define KSBONJSON_IS_LITTLE_ENDIAN 1
+#  elif defined(_MSC_VER) && (defined(_M_ARM) || defined(_M_ARM64))
+#    define KSBONJSON_IS_LITTLE_ENDIAN 1
+#  else
+#    error Unknown machine endianness detected. User needs to define KSBONJSON_IS_LITTLE_ENDIAN.
+#  endif
+#endif // KSBONJSON_IS_LITTLE_ENDIAN
 
 // Compiler hints for "if" statements
 #define likely_if(x) if(__builtin_expect(x,1))
@@ -90,24 +135,14 @@ enum
     INTSMALL_POSITIVE_EDGE = 106,
 };
 
-union uint64_u
+union number_bits
 {
-    uint64_t u64;
-    uint8_t b[8];
-};
-
-union float32_u
-{
-    float f32;
+    uint8_t  b[8];
     uint32_t u32;
-    uint8_t b[4];
-};
-
-union float64_u
-{
-    double f64;
     uint64_t u64;
-    uint8_t b[8];
+    int64_t  i64;
+    float    f32;
+    double   f64;
 };
 
 
@@ -125,12 +160,6 @@ union float64_u
         } \
     } \
     while(0)
-
-#define SHOULD_BE_IN_OBJECT() \
-    unlikely_if(!container->isObject) \
-    { \
-        return KSBONJSON_ENCODE_NOT_IN_AN_OBJECT; \
-    }
 
 #define SHOULD_NOT_BE_EXPECTING_OBJECT_NAME() \
     unlikely_if(container->isObject \
@@ -185,6 +214,25 @@ static ksbonjson_encodeStatus beginContainer(KSBONJSONEncodeContext* const ctx,
     return addByte(ctx, typeCode);
 }
 
+static ksbonjson_encodeStatus encodeNumberType(KSBONJSONEncodeContext* const ctx, const uint8_t typeCode, const uint64_t value, size_t byteCount)
+{
+    // Allocate 2 unions to give scratch space in front of the encoded value
+    union number_bits bits[2];
+    // The last byte of our scratch space will hold the type code
+    bits[0].b[7] = typeCode;
+
+#if KSBONJSON_IS_LITTLE_ENDIAN
+    bits[1].u64 = value;
+#else
+    for(uint64_t v = value, i = 0; i < byteCount; v >>= 8, i++)
+    {
+        bits[1].b[i] = (uint8_t)v;
+    }
+#endif
+
+    return addBytes(ctx, &bits[0].b[7], byteCount + 1);
+}
+
 
 // ============================================================================
 // API
@@ -231,26 +279,6 @@ ksbonjson_encodeStatus ksbonjson_addBoolean(KSBONJSONEncodeContext* const ctx, c
     return addByte(ctx, value ? TYPE_TRUE : TYPE_FALSE);
 }
 
-static ksbonjson_encodeStatus encodeIntegerType(KSBONJSONEncodeContext* const ctx, const uint8_t typeCode, const uint64_t value, size_t byteCount)
-{
-    // Allocate 2 unions to give scratch space in front of the encoded u64
-    union uint64_u u[2];
-    u[1].u64 = value;
-#if KSBONJSON_IS_LITTLE_ENDIAN
-    // The last byte of our scratch space will hold the type code
-    u[0].b[7] = typeCode + byteCount - 1;
-    return addBytes(ctx, &u[0].b[7], byteCount + 1);
-#else
-    uint8_t data[byteCount + 1];
-    data[0] = typeCode + byteCount - 1;
-    for(size_t i = 0; i < byteCount; i++)
-    {
-        data[byteCount - i] = u[1].b[i];
-    }
-    return addBytes(ctx, data, sizeof(data));
-#endif
-}
-
 ksbonjson_encodeStatus ksbonjson_addUnsignedInteger(KSBONJSONEncodeContext* const ctx, const uint64_t value)
 {
     KSBONJSONContainerState* const container = &ctx->containers[ctx->containerDepth];
@@ -272,7 +300,7 @@ ksbonjson_encodeStatus ksbonjson_addUnsignedInteger(KSBONJSONEncodeContext* cons
 
     // If the top bit isn't set, save as a signed int
     uint8_t typeCode = ((value >> (byteCount*8-1)) == 0) ? TYPE_SINT8 : TYPE_UINT8;
-    return encodeIntegerType(ctx, typeCode, value, byteCount);
+    return encodeNumberType(ctx, (uint8_t)(typeCode + byteCount - 1), value, byteCount);
 }
 
 ksbonjson_encodeStatus ksbonjson_addSignedInteger(KSBONJSONEncodeContext* const ctx, const int64_t value)
@@ -303,7 +331,7 @@ ksbonjson_encodeStatus ksbonjson_addSignedInteger(KSBONJSONEncodeContext* const 
         // Cutting off this 0xff byte would change the sign
         byteCount++;
     }
-    return encodeIntegerType(ctx, TYPE_SINT8, value, byteCount);
+    return encodeNumberType(ctx, (uint8_t)(TYPE_SINT8 + byteCount - 1), (uint64_t)value, byteCount);
 }
 
 ksbonjson_encodeStatus ksbonjson_addFloat(KSBONJSONEncodeContext* const ctx, const double value)
@@ -318,15 +346,13 @@ ksbonjson_encodeStatus ksbonjson_addFloat(KSBONJSONEncodeContext* const ctx, con
     SHOULD_NOT_BE_EXPECTING_OBJECT_NAME();
     SHOULD_NOT_BE_CHUNKING_STRING();
 
-    // Allocate 2 unions to give scratch space in front of the encoded f64
-    union float64_u f64[2];
-    f64[1].f64 = value;
+    union number_bits bits = {.f64 = value};
 
     // When all exponent bits are set, it signifies an infinite or NaN value
-    unlikely_if((f64[1].u64 & 0x7ff0000000000000ULL) == 0x7ff0000000000000ULL)
+    unlikely_if((bits.u64 & 0x7ff0000000000000ULL) == 0x7ff0000000000000ULL)
     {
         // If the significand is 0, it's infinite
-        if((f64[1].u64 & 0x000fffffffffffffULL) == 0)
+        if((bits.u64 & 0x000fffffffffffffULL) == 0)
         {
             return KSBONJSON_ENCODE_INF;
         }
@@ -335,38 +361,27 @@ ksbonjson_encodeStatus ksbonjson_addFloat(KSBONJSONEncodeContext* const ctx, con
 
     container->isExpectingName = true;
 
-    // Allocate 2 unions to give scratch space in front of the encoded f32
-    union float32_u f32[2];
-    f32[1].f32 = value;
-    if((double)f32[1].f32 == value)
+    bits.f32 = (float)value;
+    if((double)bits.f32 == value)
     {
-        // Use our scratch space to build a potential f16 encoding
-        f32[0].f32 = value;
-        f32[0].b[0] = 0;
-        f32[0].b[1] = 0;
-        if((double)f32[0].f32 == value)
+        // Check if we fit into a bfloat16
+        bits.u32 &= ~0xffffu;
+        if((double)bits.f32 == value)
         {
-            f32[0].b[1] = TYPE_FLOAT16;
-            return addBytes(ctx, &f32[0].b[1], 3);
+            bits.u32 >>= 16;
+            return encodeNumberType(ctx, TYPE_FLOAT16, bits.u64, 2);
         }
-#if KSBONJSON_IS_LITTLE_ENDIAN
-        // The last byte of our scratch space will hold the type code
-        f32[0].b[3] = TYPE_FLOAT32;
-        return addBytes(ctx, &f32[0].b[3], 5);
-#else
-        uint8_t data[] = {TYPE_FLOAT32, f32[1].b[3], f32[1].b[2], f32[1].b[1], f32[1].b[0]};
-        return addBytes(ctx, data, sizeof(data));
-#endif
+        bits.f32 = (float)value;
+        return encodeNumberType(ctx, TYPE_FLOAT32, bits.u64, 4);
     }
+    bits.f64 = value;
+    return encodeNumberType(ctx, TYPE_FLOAT64, bits.u64, 8);
+}
 
-#if KSBONJSON_IS_LITTLE_ENDIAN
-    // The last byte of our scratch space will hold the type code
-    f64[0].b[7] = TYPE_FLOAT64;
-    return addBytes(ctx, &f64[0].b[7], 9);
-#else
-    uint8_t data[] = {TYPE_FLOAT64, f64[1].b[7], f64[1].b[6], f64[1].b[5], f64[1].b[4], f64[1].b[3], f64[1].b[2], f64[1].b[1], f64[1].b[0]};
-    return addBytes(ctx, data, sizeof(data));
-#endif
+ksbonjson_encodeStatus ksbonjson_addBigNumber(KSBONJSONEncodeContext* const ctx, const KSBigNumber value)
+{
+    // TODO
+    return KSBONJSON_ENCODE_COULD_NOT_ADD_DATA;
 }
 
 ksbonjson_encodeStatus ksbonjson_addNull(KSBONJSONEncodeContext* const ctx)
@@ -391,16 +406,16 @@ ksbonjson_encodeStatus ksbonjson_addString(KSBONJSONEncodeContext* const ctx,
 
     if(valueLength <= 15)
     {
-        PROPAGATE_ERROR(addByte(ctx, TYPE_STRING0 + valueLength));
+        PROPAGATE_ERROR(addByte(ctx, (uint8_t)(TYPE_STRING0 + valueLength)));
         if(valueLength == 0)
         {
             return KSBONJSON_ENCODE_OK;
         }
-        return addBytes(ctx, (uint8_t*)value, valueLength);
+        return addBytes(ctx, (const uint8_t*)value, valueLength);
     }
 
     PROPAGATE_ERROR(addByte(ctx, TYPE_STRING));
-    PROPAGATE_ERROR(addBytes(ctx, (uint8_t*)value, valueLength));
+    PROPAGATE_ERROR(addBytes(ctx, (const uint8_t*)value, valueLength));
     return addByte(ctx, STRING_TERMINATOR);
 }
 
@@ -416,7 +431,7 @@ ksbonjson_encodeStatus ksbonjson_chunkString(KSBONJSONEncodeContext* const ctx,
     {
         PROPAGATE_ERROR(addByte(ctx, TYPE_STRING));
     }
-    PROPAGATE_ERROR(addBytes(ctx, (uint8_t*)chunk, chunkLength));
+    PROPAGATE_ERROR(addBytes(ctx, (const uint8_t*)chunk, chunkLength));
 
     likely_if(!isLastChunk)
     {

@@ -3,7 +3,7 @@ project(
   'c',
   version : '1.0.0',
   license : 'MIT',
-  default_options : ['c_std=c11', 'cpp_std=c++11', 'warning_level=3']
+  default_options : ['c_std=c11', 'cpp_std=c++11', 'warning_level=everything']
 )
 project_description = 'BONJSON codec library'
 

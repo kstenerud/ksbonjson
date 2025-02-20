@@ -34,6 +34,7 @@ protected:
     virtual ksbonjson_decodeStatus onValue(int64_t value) = 0;
     virtual ksbonjson_decodeStatus onValue(uint64_t value) = 0;
     virtual ksbonjson_decodeStatus onValue(double value) = 0;
+    virtual ksbonjson_decodeStatus onValue(KSBigNumber value) = 0;
     virtual ksbonjson_decodeStatus onString(const char* value, size_t length) = 0;
     virtual ksbonjson_decodeStatus onNull() = 0;
     virtual ksbonjson_decodeStatus onBeginObject() = 0;
@@ -48,6 +49,7 @@ private:
     friend ksbonjson_decodeStatus onValue(int64_t value, void* userData);
     friend ksbonjson_decodeStatus onValue(uint64_t value, void* userData);
     friend ksbonjson_decodeStatus onValue(double value, void* userData);
+    friend ksbonjson_decodeStatus onValue(KSBigNumber value, void* userData);
     friend ksbonjson_decodeStatus onString(const char* KSBONJSON_RESTRICT value,
                                            size_t length,
                                            void* KSBONJSON_RESTRICT userData);
@@ -71,6 +73,10 @@ ksbonjson_decodeStatus onValue(uint64_t value, void* userData)
     return ((Decoder*)userData)->onValue(value);
 }
 ksbonjson_decodeStatus onValue(double value, void* userData)
+{
+    return ((Decoder*)userData)->onValue(value);
+}
+ksbonjson_decodeStatus onValue(KSBigNumber value, void* userData)
 {
     return ((Decoder*)userData)->onValue(value);
 }
@@ -107,6 +113,7 @@ Decoder::Decoder()
     .onUnsignedInteger = ksbonjson::onValue,
     .onSignedInteger = ksbonjson::onValue,
     .onFloat = ksbonjson::onValue,
+    .onBigNumber = ksbonjson::onValue,
     .onNull = ksbonjson::onNull,
     .onString = ksbonjson::onString,
     .onBeginObject = ksbonjson::onBeginObject,

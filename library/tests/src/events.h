@@ -171,6 +171,50 @@ protected:
     }
 };
 
+std::ostream &operator<<(std::ostream &os, KSBigNumber const &v) {
+    return os << (v.significand_sign < 0 ? "-" : "")
+    << v.significand << "e" << v.exponent;
+}
+
+bool operator==(KSBigNumber const &l, KSBigNumber const &r) {
+    // Just do a naive comparison
+    return l.significand_sign == r.significand_sign &&
+    l.significand == r.significand &&
+    l.exponent == r.exponent;
+}
+
+class BigNumberEvent: public Event
+{
+public:
+    BigNumberEvent(KSBigNumber value)
+    : value(value)
+    {}
+    virtual ~BigNumberEvent() {}
+    virtual ksbonjson_encodeStatus operator()(KSBONJSONEncodeContext* ctx) override
+    {
+        return ksbonjson_addBigNumber(ctx, value);
+    }
+    virtual std::string comparator() const override
+    {
+        std::ostringstream str;
+        str << value;
+        return str.str();
+    }
+    virtual std::string description() const override
+    {
+        std::ostringstream str;
+        str << "BIG(" << value << ")";
+        return str.str();
+    }
+private:
+    const KSBigNumber value;
+protected:
+    virtual bool isEqual(const Event& obj) const override {
+        auto v = static_cast<const BigNumberEvent&>(obj);
+        return Event::isEqual(v) && v.value == value;
+    }
+};
+
 class NullEvent: public Event
 {
 public:

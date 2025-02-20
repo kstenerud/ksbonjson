@@ -66,49 +66,6 @@
 #   endif
 #endif
 
-/**
- * Best-effort attempt to get the endianness of the machine being compiled for.
- * If this fails, you will have to define it manually.
- *
- * Shamelessly stolen from https://github.com/Tencent/rapidjson/blob/master/include/rapidjson/rapidjson.h
- */
-#ifndef KSBONJSON_IS_LITTLE_ENDIAN
-// Detect with GCC 4.6's macro
-#  ifdef __BYTE_ORDER__
-#    if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-#      define KSBONJSON_IS_LITTLE_ENDIAN 1
-#    elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-#      define KSBONJSON_IS_LITTLE_ENDIAN 0
-#    else
-#      error Unknown machine endianness detected. User needs to define KSBONJSON_IS_LITTLE_ENDIAN.
-#    endif // __BYTE_ORDER__
-// Detect with GLIBC's endian.h
-#  elif defined(__GLIBC__)
-#    include <endian.h>
-#    if (__BYTE_ORDER == __LITTLE_ENDIAN)
-#      define KSBONJSON_IS_LITTLE_ENDIAN 1
-#    elif (__BYTE_ORDER == __BIG_ENDIAN)
-#      define KSBONJSON_IS_LITTLE_ENDIAN 0
-#    else
-#      error Unknown machine endianness detected. User needs to define KSBONJSON_IS_LITTLE_ENDIAN.
-#   endif // __GLIBC__
-// Detect with _LITTLE_ENDIAN and _BIG_ENDIAN macro
-#  elif defined(_LITTLE_ENDIAN) && !defined(_BIG_ENDIAN)
-#    define KSBONJSON_IS_LITTLE_ENDIAN 1
-#  elif defined(_BIG_ENDIAN) && !defined(_LITTLE_ENDIAN)
-#    define KSBONJSON_IS_LITTLE_ENDIAN 0
-// Detect with architecture macros
-#  elif defined(__sparc) || defined(__sparc__) || defined(_POWER) || defined(__powerpc__) || defined(__ppc__) || defined(__ppc64__) || defined(__hpux) || defined(__hppa) || defined(_MIPSEB) || defined(_POWER) || defined(__s390__)
-#    define KSBONJSON_IS_LITTLE_ENDIAN 0
-#  elif defined(__i386__) || defined(__alpha__) || defined(__ia64) || defined(__ia64__) || defined(_M_IX86) || defined(_M_IA64) || defined(_M_ALPHA) || defined(__amd64) || defined(__amd64__) || defined(_M_AMD64) || defined(__x86_64) || defined(__x86_64__) || defined(_M_X64) || defined(__bfin__)
-#    define KSBONJSON_IS_LITTLE_ENDIAN 1
-#  elif defined(_MSC_VER) && (defined(_M_ARM) || defined(_M_ARM64))
-#    define KSBONJSON_IS_LITTLE_ENDIAN 1
-#  else
-#    error Unknown machine endianness detected. User needs to define KSBONJSON_IS_LITTLE_ENDIAN.
-#  endif
-#endif // KSBONJSON_IS_LITTLE_ENDIAN
-
 
 // ============================================================================
 // Header
@@ -173,6 +130,16 @@ typedef enum
     KSBONJSON_DECODE_COULD_NOT_PROCESS_DATA = 100,
 } ksbonjson_decodeStatus;
 
+#ifndef TYPEDEF_KSBIGNUMBER
+#define TYPEDEF_KSBIGNUMBER
+typedef struct
+{
+    uint64_t significand;
+    int32_t significand_sign;
+    int32_t exponent;
+} KSBigNumber;
+#endif // TYPEDEF_KSBIGNUMBER
+
 /**
  * Callbacks called during a BONJSON decode process.
  * All function pointers must point to valid functions.
@@ -214,6 +181,15 @@ typedef struct KSBONJSONDecodeCallbacks
      * @return KSBONJSON_DECODE_OK if decoding should continue.
      */
     ksbonjson_decodeStatus (*onFloat)(double value, void* userData);
+
+    /**
+     * Called when a Big Number element value is decoded.
+     *
+     * @param value The element's value.
+     * @param userData Data that was specified when calling ksbonjson_decode().
+     * @return KSBONJSON_DECODE_OK if decoding should continue.
+     */
+    ksbonjson_decodeStatus (*onBigNumber)(KSBigNumber value, void* userData);
 
     /**
      * Called when a null element value is decoded.
