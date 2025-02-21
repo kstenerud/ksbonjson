@@ -24,10 +24,6 @@ public:
     {
         return decode(document.data(), document.size(), decodedOffset);
     }
-    std::string decodeStatusDescription(ksbonjson_decodeStatus status)
-    {
-        return ::ksbonjson_decodeStatusDescription(status);
-    }
 
 protected:
     virtual ksbonjson_decodeStatus onValue(bool value) = 0;

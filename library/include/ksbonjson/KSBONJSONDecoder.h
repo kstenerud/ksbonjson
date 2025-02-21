@@ -32,8 +32,13 @@
 #include <sys/types.h>
 
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 // ============================================================================
-// Compile-time Configuration
+// Compile-time Configuration (synced with encoder)
 // ============================================================================
 
 /**
@@ -68,12 +73,41 @@
 
 
 // ============================================================================
-// Header
+// Common Declarations (synced with encoder)
 // ============================================================================
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#ifndef TYPEDEF_KSBIGNUMBER
+#define TYPEDEF_KSBIGNUMBER
+    typedef struct
+    {
+        uint64_t significand;     // Unsigned 64-bit absolute value
+        int32_t significand_sign; // 1 or -1
+        int32_t exponent;
+    } KSBigNumber;
+
+    /**
+     * Create a new Big Number
+     * @param sign The sign to apply to the significand: 1 (positive) or -1 (negative)
+     * @param significandAbs The absolute value of the significand
+     * @param exponent The exponent
+     * @return A new Big Number
+     */
+    static inline KSBigNumber ksbonjson_newBigNumber(int sign, uint64_t significandAbs, int32_t exponent)
+    {
+        KSBigNumber n =
+        {
+            .significand = significandAbs,
+            .significand_sign = (int32_t)sign,
+            .exponent = exponent
+        };
+        return n;
+    }
+#endif // TYPEDEF_KSBIGNUMBER
+
+
+// ============================================================================
+// Decoder Declarations
+// ============================================================================
 
 typedef enum
 {
@@ -129,16 +163,6 @@ typedef enum
      */
     KSBONJSON_DECODE_COULD_NOT_PROCESS_DATA = 100,
 } ksbonjson_decodeStatus;
-
-#ifndef TYPEDEF_KSBIGNUMBER
-#define TYPEDEF_KSBIGNUMBER
-typedef struct
-{
-    uint64_t significand;
-    int32_t significand_sign;
-    int32_t exponent;
-} KSBigNumber;
-#endif // TYPEDEF_KSBIGNUMBER
 
 /**
  * Callbacks called during a BONJSON decode process.
@@ -257,7 +281,7 @@ typedef struct KSBONJSONDecodeCallbacks
 
 
 // ============================================================================
-// API
+// Decoder API
 // ============================================================================
 
 /**
@@ -283,8 +307,12 @@ KSBONJSON_PUBLIC ksbonjson_decodeStatus ksbonjson_decode(const uint8_t* KSBONJSO
  *
  * @return A statically allocated string describing the status.
  */
-KSBONJSON_PUBLIC const char* ksbonjson_decodeStatusDescription(ksbonjson_decodeStatus status);
+KSBONJSON_PUBLIC const char* ksbonjson_describeDecodeStatus(ksbonjson_decodeStatus status);
 
+
+// ============================================================================
+// End
+// ============================================================================
 
 #ifdef __cplusplus
 }

@@ -41,7 +41,7 @@
 
 
 // ============================================================================
-// Utilities
+// Utility
 // ============================================================================
 
 // Compiler hints for "if" statements
@@ -63,7 +63,7 @@ static void printError(const char* const fmt, ...)
     va_end(args);
 }
 
-static void printError_exit(const char* const fmt, ...)
+static void printErrorAndExit(const char* const fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
@@ -73,7 +73,7 @@ static void printError_exit(const char* const fmt, ...)
     exit(1);
 }
 
-static void printPError_exit(const char* const fmt, ...)
+static void printPErrorAndExit(const char* const fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
@@ -93,7 +93,7 @@ static FILE* openFileForReading(const char* const filename)
     FILE* const file = fopen(filename, "rb");
     if(file == NULL)
     {
-        printPError_exit("Could not open %s", filename);
+        printPErrorAndExit("Could not open %s", filename);
     }
     return file;
 }
@@ -107,7 +107,7 @@ static FILE* openFileForWriting(const char* const filename)
     FILE* const file = fopen(filename, "wb");
     if(file == NULL)
     {
-        printPError_exit("Could not open %s", filename);
+        printPErrorAndExit("Could not open %s", filename);
     }
     return file;
 }
@@ -118,7 +118,7 @@ static void closeFile(FILE* const file)
     {
         if(fclose(file) == EOF)
         {
-            printPError_exit("Could not close file");
+            printPErrorAndExit("Could not close file");
         }
     }
 }
@@ -134,7 +134,7 @@ static uint8_t* readEntireFile(FILE* const file, size_t* const fileLength)
         size_t bytes_read = fread(buffer+bufferOffset, 1, length, file);
         if(ferror(file))
         {
-            printPError_exit("Could not read %d bytes from file", length);
+            printPErrorAndExit("Could not read %d bytes from file", length);
         }
         bufferOffset += bytes_read;
         if(feof(file))
@@ -145,7 +145,7 @@ static uint8_t* readEntireFile(FILE* const file, size_t* const fileLength)
         {
             if(bufferOffset >= MAX_FILE_SIZE)
             {
-                printError_exit("Exceeded max file size of %d", MAX_FILE_SIZE);
+                printErrorAndExit("Exceeded max file size of %d", MAX_FILE_SIZE);
             }
 
             bufferSize *= 2;
@@ -164,7 +164,7 @@ static void writeToFile(FILE* const file, const uint8_t* const data, const int l
 {
     if(fwrite(data, 1, length, file) != (unsigned)length)
     {
-        printPError_exit("Could not write %d bytes to file", length);
+        printPErrorAndExit("Could not write %d bytes to file", length);
     }
 }
 
@@ -190,16 +190,16 @@ typedef struct
     size_t pos;
 } bonjson_encode_context;
 
-static bonjson_encode_context* new_bonjson_encode_context(size_t buffer_size)
+static bonjson_encode_context* newBonjsonEncodeContext(size_t buffer_size)
 {
-    bonjson_encode_context* ctx = calloc(1, sizeof(bonjson_encode_context));
+    bonjson_encode_context* const ctx = calloc(1, sizeof(bonjson_encode_context));
     ctx->buffer = calloc(1, buffer_size);
     ctx->size = buffer_size;
     ctx->pos = 0;
     return ctx;
 }
 
-static void free_bonjson_encode_context(bonjson_encode_context* ctx)
+static void freeBonjsonEncodeContext(bonjson_encode_context* ctx)
 {
     free(ctx->buffer);
     free(ctx);
@@ -215,6 +215,21 @@ static void free_bonjson_encode_context(bonjson_encode_context* ctx)
         } \
     } \
     while(0)
+
+static ksbonjson_encodeStatus addEncodedDataCallback(const uint8_t* KSBONJSON_RESTRICT data,
+                                              size_t dataLength,
+                                              void* KSBONJSON_RESTRICT userData)
+{
+    bonjson_encode_context* const ctx = (bonjson_encode_context*)userData;
+    if(ctx->pos + dataLength > ctx->size)
+    {
+        printErrorAndExit("BUG: BONJSON buffer was too small (%d + %d > %d)", ctx->pos, dataLength, ctx->size);
+    }
+    memcpy(ctx->buffer+ctx->pos, data, dataLength);
+    ctx->pos += dataLength;
+
+    return KSBONJSON_ENCODE_OK;
+}
 
 static ksbonjson_encodeStatus parseJsonObject(json_object *obj, KSBONJSONEncodeContext* ctx);
 static ksbonjson_encodeStatus parseJsonArray(json_object *obj, KSBONJSONEncodeContext* ctx);
@@ -250,8 +265,8 @@ static ksbonjson_encodeStatus parseJsonElement(json_object *obj, KSBONJSONEncode
             // we don't end up with a truncated value.
             // Internally, it's determined by cint_type, but there's no
             // public API for it so we have to go through this song and dance >:(
-            int64_t asInt = json_object_get_int64(obj);
-            uint64_t asUint = json_object_get_uint64(obj);
+            const int64_t asInt = json_object_get_int64(obj);
+            const uint64_t asUint = json_object_get_uint64(obj);
             if(asInt >= 0 && asUint > (uint64_t)asInt)
             {
                 PROPAGATE_ENCODE_ERROR(ksbonjson_addUnsignedInteger(ctx, asUint));
@@ -264,20 +279,20 @@ static ksbonjson_encodeStatus parseJsonElement(json_object *obj, KSBONJSONEncode
         }
         case json_type_string:
         {
-            const char* str = json_object_get_string(obj);
+            const char* const str = json_object_get_string(obj);
             PROPAGATE_ENCODE_ERROR(ksbonjson_addString(ctx, str, strlen(str)));
             break;
         }
 
         default:
-            printError_exit("Unknown JSON type %d", json_object_get_type(obj));
+            printErrorAndExit("Unknown JSON type %d", json_object_get_type(obj));
     }
     return KSBONJSON_ENCODE_OK;
 }
 
 static ksbonjson_encodeStatus parseJsonArray(json_object *obj, KSBONJSONEncodeContext* ctx)
 {
-    int array_length = json_object_array_length(obj);
+    const int array_length = json_object_array_length(obj);
     for(int i = 0; i < array_length; i++)
     {
         PROPAGATE_ENCODE_ERROR(parseJsonElement(json_object_array_get_idx(obj, i), ctx));
@@ -291,22 +306,7 @@ static ksbonjson_encodeStatus parseJsonObject(json_object *obj, KSBONJSONEncodeC
     {
         PROPAGATE_ENCODE_ERROR(ksbonjson_addString(ctx, key, strlen(key)));
         parseJsonElement(val, ctx);
-   }
-    return KSBONJSON_ENCODE_OK;
-}
-
-static ksbonjson_encodeStatus addEncodedDataCallback(const uint8_t* KSBONJSON_RESTRICT data,
-                                              size_t dataLength,
-                                              void* KSBONJSON_RESTRICT userData)
-{
-    bonjson_encode_context* ctx = (bonjson_encode_context*)userData;
-    if(ctx->pos + dataLength > ctx->size)
-    {
-        printError_exit("BUG: BONJSON buffer was too small (%d + %d > %d)", ctx->pos, dataLength, ctx->size);
     }
-    memcpy(ctx->buffer+ctx->pos, data, dataLength);
-    ctx->pos += dataLength;
-
     return KSBONJSON_ENCODE_OK;
 }
 
@@ -314,37 +314,37 @@ static ksbonjson_encodeStatus jsonToBonjson(const char* src_path, const char* ds
 {
     FILE* file = openFileForReading(src_path);
     size_t documentSize = 0;
-    uint8_t* document = readEntireFile(file, &documentSize);
+    const uint8_t* const document = readEntireFile(file, &documentSize);
     closeFile(file);
 
-	json_tokener* tokener = json_tokener_new_ex(JSON_TOKENER_DEFAULT_DEPTH);
+	json_tokener* const tokener = json_tokener_new_ex(JSON_TOKENER_DEFAULT_DEPTH);
     if(tokener == NULL)
     {
-        printError_exit("Failed to build tokener");
+        printErrorAndExit("Failed to build tokener");
     }
 
-    json_object *root = json_tokener_parse_ex(tokener, (const char*)document, documentSize);
+    json_object* const root = json_tokener_parse_ex(tokener, (const char*)document, documentSize);
     json_tokener_free(tokener);
     if(root == NULL)
     {
-        printError_exit("Failed to parse JSON");
+        printErrorAndExit("Failed to parse JSON");
     }
 
-    bonjson_encode_context* ctx = new_bonjson_encode_context(documentSize*2);
+    bonjson_encode_context* const ctx = newBonjsonEncodeContext(documentSize*2);
     KSBONJSONEncodeContext eContext;
     ksbonjson_beginEncode(&eContext, addEncodedDataCallback, ctx);
-    ksbonjson_encodeStatus status = parseJsonElement(root, &eContext);
+    const ksbonjson_encodeStatus status = parseJsonElement(root, &eContext);
     if(status != KSBONJSON_ENCODE_OK)
     {
-        printError_exit("Failed to convert JSON to BONJSON: status %d (%s)",
+        printErrorAndExit("Failed to convert JSON to BONJSON: status %d (%s)",
                         status,
-                        ksbonjson_encodeStatusDescription(status));
+                        ksbonjson_describeEncodeStatus(status));
     }
 
     file = openFileForWriting(dst_path);
     writeToFile(file, ctx->buffer, ctx->pos);
     closeFile(file);
-    free_bonjson_encode_context(ctx);
+    freeBonjsonEncodeContext(ctx);
 
     return KSBONJSON_ENCODE_OK;
 }
@@ -357,7 +357,7 @@ static ksbonjson_encodeStatus jsonToBonjson(const char* src_path, const char* ds
 #define PROPAGATE_DECODE_ERROR(CALL) \
     do \
     { \
-        ksbonjson_decodeStatus propagated_result = CALL; \
+        const ksbonjson_decodeStatus propagated_result = CALL; \
         unlikely_if(propagated_result != KSBONJSON_DECODE_OK) \
         { \
             return propagated_result; \
@@ -382,7 +382,7 @@ typedef struct
 
 static int addObject(DecoderContext* ctx, json_object* obj)
 {
-    DecoderFrame* frame = &ctx->stack[ctx->stackIndex];
+    DecoderFrame* const frame = &ctx->stack[ctx->stackIndex];
     if(frame->obj == NULL)
     {
         frame->obj = obj;
@@ -401,31 +401,31 @@ static int addObject(DecoderContext* ctx, json_object* obj)
 
 static ksbonjson_decodeStatus onBoolean(bool value, void* userData)
 {
-    DecoderContext* ctx = (DecoderContext*)userData;
+    DecoderContext* const ctx = (DecoderContext*)userData;
     return addObject(ctx, json_object_new_boolean(value));
 }
 
 static ksbonjson_decodeStatus onUnsignedInteger(uint64_t value, void* userData)
 {
-    DecoderContext* ctx = (DecoderContext*)userData;
+    DecoderContext* const ctx = (DecoderContext*)userData;
     return addObject(ctx, json_object_new_uint64(value));
 }
 
 static ksbonjson_decodeStatus onSignedInteger(int64_t value, void* userData)
 {
-    DecoderContext* ctx = (DecoderContext*)userData;
+    DecoderContext* const ctx = (DecoderContext*)userData;
     return addObject(ctx, json_object_new_int64(value));
 }
 
 static ksbonjson_decodeStatus onFloat(double value, void* userData)
 {
-    DecoderContext* ctx = (DecoderContext*)userData;
+    DecoderContext* const ctx = (DecoderContext*)userData;
     return addObject(ctx, json_object_new_double(value));
 }
 
 static ksbonjson_decodeStatus onNull(void* userData)
 {
-    DecoderContext* ctx = (DecoderContext*)userData;
+    DecoderContext* const ctx = (DecoderContext*)userData;
     return addObject(ctx, json_object_new_null());
 }
 
@@ -433,8 +433,8 @@ static ksbonjson_decodeStatus onString(const char* KSBONJSON_RESTRICT value,
                                        size_t length,
                                        void* KSBONJSON_RESTRICT userData)
 {
-    DecoderContext* ctx = (DecoderContext*)userData;
-    DecoderFrame* frame = &ctx->stack[ctx->stackIndex];
+    DecoderContext* const ctx = (DecoderContext*)userData;
+    DecoderFrame* const frame = &ctx->stack[ctx->stackIndex];
     if(frame->nextIsName)
     {
         replaceString(&ctx->nextName, value, length);
@@ -449,11 +449,11 @@ static ksbonjson_decodeStatus onString(const char* KSBONJSON_RESTRICT value,
 
 static ksbonjson_decodeStatus onBeginObject(void* userData)
 {
-    DecoderContext* ctx = (DecoderContext*)userData;
-    json_object *obj = json_object_new_object();
+    DecoderContext* const ctx = (DecoderContext*)userData;
+    json_object* const obj = json_object_new_object();
     PROPAGATE_DECODE_ERROR(addObject(ctx, obj));
     ctx->stackIndex++;
-    DecoderFrame* frame = &ctx->stack[ctx->stackIndex];
+    DecoderFrame* const frame = &ctx->stack[ctx->stackIndex];
     frame->obj = obj;
     frame->isInObject = true;
     frame->nextIsName = true;
@@ -462,11 +462,11 @@ static ksbonjson_decodeStatus onBeginObject(void* userData)
 
 static ksbonjson_decodeStatus onBeginArray(void* userData)
 {
-    DecoderContext* ctx = (DecoderContext*)userData;
-    json_object *obj = json_object_new_array();
+    DecoderContext* const ctx = (DecoderContext*)userData;
+    json_object* const obj = json_object_new_array();
     PROPAGATE_DECODE_ERROR(addObject(ctx, obj));
     ctx->stackIndex++;
-    DecoderFrame* frame = &ctx->stack[ctx->stackIndex];
+    DecoderFrame* const frame = &ctx->stack[ctx->stackIndex];
     frame->obj = obj;
     frame->isInObject = false;
     frame->nextIsName = false;
@@ -475,7 +475,7 @@ static ksbonjson_decodeStatus onBeginArray(void* userData)
 
 static ksbonjson_decodeStatus onEndContainer(void* userData)
 {
-    DecoderContext* ctx = (DecoderContext*)userData;
+    DecoderContext* const ctx = (DecoderContext*)userData;
     ctx->stackIndex--;
     return KSBONJSON_DECODE_OK;
 }
@@ -486,7 +486,7 @@ static ksbonjson_decodeStatus onEndData(void* userData)
     return KSBONJSON_DECODE_OK;
 }
 
-static void init_decoder_context(DecoderContext* ctx)
+static void initDecoderContext(DecoderContext* ctx)
 {
     memset(ctx, 0, sizeof(*ctx));
     ctx->callbacks.onBeginArray = onBeginArray;
@@ -504,21 +504,21 @@ static void init_decoder_context(DecoderContext* ctx)
 static void bonjsonToJson(const char* const src_path, const char* const dst_path, bool prettyPrint)
 {
     DecoderContext ctx;
-    init_decoder_context(&ctx);
+    initDecoderContext(&ctx);
     FILE* file = openFileForReading(src_path);
     size_t documentSize = 0;
-    uint8_t* document = readEntireFile(file, &documentSize);
+    const uint8_t* document = readEntireFile(file, &documentSize);
     closeFile(file);
     size_t decodedOffset;
 
     ksbonjson_decodeStatus status = ksbonjson_decode(document, documentSize, &ctx.callbacks, &ctx, &decodedOffset);
     if(status != KSBONJSON_DECODE_OK)
     {
-        printError_exit("Failed to decode BONJSON file %s at offset %d: status %d (%s)",
+        printErrorAndExit("Failed to decode BONJSON file %s at offset %d: status %d (%s)",
                         src_path,
                         decodedOffset,
                         status,
-                        ksbonjson_decodeStatusDescription(status));
+                        ksbonjson_describeDecodeStatus(status));
     }
 
     file = openFileForWriting(dst_path);
@@ -537,7 +537,7 @@ static void bonjsonToJson(const char* const src_path, const char* const dst_path
 
 static char* g_argv_0;
 
-static void print_usage(void)
+static void printUsage(void)
 {
     printError("\
 Purpose:   Convert JSON <-> BONJSON.\n\
@@ -560,13 +560,7 @@ Options:\n\
 ", EXPAND_AND_QUOTE(PROJECT_VERSION), basename(g_argv_0));
 }
 
-static void print_usage_printError_exit(void)
-{
-    print_usage();
-    exit(1);
-}
-
-static void print_version(void)
+static void printVersion(void)
 {
     printf("%s\n", EXPAND_AND_QUOTE(PROJECT_VERSION));
 }
@@ -592,10 +586,10 @@ int main(const int argc, char** const argv)
         {
             case '?':
             case 'h':
-                print_usage();
+                printUsage();
                 exit(0);
             case 'v':
-                print_version();
+                printVersion();
                 exit(0);
             case 'b':
                 toJson = false;
@@ -614,7 +608,7 @@ int main(const int argc, char** const argv)
                 break;
             default:
                 printf("Unknown option: %d %c\n", ch, ch);
-                print_usage_printError_exit();
+                exit(1);
         }
     }
 

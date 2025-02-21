@@ -3,7 +3,7 @@ Reference Library for BONJSON
 
 A C implementation to demonstrate a simple [BONJSON](https://github.com/kstenerud/bonjson/blob/main/bonjson.md) codec.
 
-The library has no external dependencies, makes no allocations, and calls no external functions beyond `memcpy`.
+This library has no external dependencies, makes no allocations, and calls no external functions beyond `memcpy()`.
 
 Limitations
 -----------
@@ -46,4 +46,20 @@ Installing
 Usage
 -----
 
-TODO
+### Decoding
+
+* Set up a `KSBONJSONDecodeCallbacks` structure
+* Load the document into memory
+* Call `ksbonjson_decode()`
+
+### Encoding
+
+* Build a "write" callback function that conforms to `KSBONJSONAddEncodedDataFunc`
+* Instantiate a `KSBONJSONEncodeContext`
+* Call `ksbonjson_beginEncode()`
+* Call the various `ksbonjson_addXYZ()` and `ksbonjson_beginXYZ()` API methods to construct your document
+* Call `ksbonjson_endEncode()` when you're done
+
+### Example
+
+See [the example JSON<>BONJSON converter](../executable) for a full, working example of how to use this library.

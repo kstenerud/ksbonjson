@@ -31,11 +31,14 @@
 #include <stdint.h>
 #include <sys/types.h>
 
-#pragma GCC diagnostic ignored "-Wpadded"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 
 // ============================================================================
-// Compile-time Configuration
+// Compile-time Configuration (synced with decoder)
 // ============================================================================
 
 /**
@@ -70,12 +73,41 @@
 
 
 // ============================================================================
-// Header
+// Common Declarations (synced with decoder)
 // ============================================================================
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#ifndef TYPEDEF_KSBIGNUMBER
+#define TYPEDEF_KSBIGNUMBER
+    typedef struct
+    {
+        uint64_t significand;     // Unsigned 64-bit absolute value
+        int32_t significand_sign; // 1 or -1
+        int32_t exponent;
+    } KSBigNumber;
+
+    /**
+     * Create a new Big Number
+     * @param sign The sign to apply to the significand: 1 (positive) or -1 (negative)
+     * @param significandAbs The absolute value of the significand
+     * @param exponent The exponent
+     * @return A new Big Number
+     */
+    static inline KSBigNumber ksbonjson_newBigNumber(int sign, uint64_t significandAbs, int32_t exponent)
+    {
+        KSBigNumber n =
+        {
+            .significand = significandAbs,
+            .significand_sign = (int32_t)sign,
+            .exponent = exponent
+        };
+        return n;
+    }
+#endif // TYPEDEF_KSBIGNUMBER
+
+
+// ============================================================================
+// Encoder Declarations
+// ============================================================================
 
 typedef enum
 {
@@ -115,14 +147,9 @@ typedef enum
     KSBONJSON_ENCODE_CONTAINERS_ARE_STILL_OPEN = 6,
 
     /**
-     * Attempted to encode a NaN value.
+     * The object to encode contains invalid data.
      */
-    KSBONJSON_ENCODE_NAN = 7,
-
-    /**
-     * Attempted to encode an infinite value.
-     */
-    KSBONJSON_ENCODE_INF = 8,
+    KSBONJSON_ENCODE_INVALID_DATA = 7,
 
     /**
      * Generic error code that can be returned from addEncodedData().
@@ -131,16 +158,6 @@ typedef enum
      */
     KSBONJSON_ENCODE_COULD_NOT_ADD_DATA = 100,
 } ksbonjson_encodeStatus;
-
-#ifndef TYPEDEF_KSBIGNUMBER
-#define TYPEDEF_KSBIGNUMBER
-typedef struct
-{
-    uint64_t significand;
-    int32_t significand_sign;
-    int32_t exponent;
-} KSBigNumber;
-#endif // TYPEDEF_KSBIGNUMBER
 
 /**
  * Function pointer for adding more encoded binary data to the document.
@@ -162,6 +179,7 @@ typedef struct
     uint8_t unused: 5;
 } KSBONJSONContainerState;
 
+#pragma GCC diagnostic ignored "-Wpadded"
 typedef struct
 {
     KSBONJSONAddEncodedDataFunc addEncodedData;
@@ -169,9 +187,11 @@ typedef struct
     int containerDepth;
     KSBONJSONContainerState containers[KSBONJSON_MAX_CONTAINER_DEPTH];
 } KSBONJSONEncodeContext;
+#pragma GCC diagnostic pop
+
 
 // ============================================================================
-// API
+// Encoder API
 // ============================================================================
 
 /**
@@ -321,8 +341,12 @@ KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_endContainer(KSBONJSONEncodeCo
  *
  * @return A statically allocated string describing the status.
  */
-KSBONJSON_PUBLIC const char* ksbonjson_encodeStatusDescription(ksbonjson_encodeStatus status);
+KSBONJSON_PUBLIC const char* ksbonjson_describeEncodeStatus(ksbonjson_encodeStatus status);
 
+
+// ============================================================================
+// End
+// ============================================================================
 
 #ifdef __cplusplus
 }
