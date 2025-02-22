@@ -533,10 +533,10 @@ ksbonjson_encodeStatus ksbonjson_addBONJSONDocument(KSBONJSONEncodeContext* cons
 ksbonjson_encodeStatus ksbonjson_beginObject(KSBONJSONEncodeContext* const ctx)
 {
     return beginContainer(ctx, TYPE_OBJECT, (KSBONJSONContainerState)
-    {
-        .isObject = true,
-        .isExpectingName = true,
-    });
+                                            {
+                                                .isObject = true,
+                                                .isExpectingName = true,
+                                            });
 }
 
 ksbonjson_encodeStatus ksbonjson_beginArray(KSBONJSONEncodeContext* const ctx)

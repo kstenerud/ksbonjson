@@ -421,10 +421,10 @@ static ksbonjson_decodeStatus beginObject(DecodeContext* const ctx)
 
     ctx->containerDepth++;
     ctx->containers[ctx->containerDepth] = (ContainerState)
-                        {
-                            .isObject = true,
-                            .isExpectingName = true,
-                        };
+                                            {
+                                                .isObject = true,
+                                                .isExpectingName = true,
+                                            };
 
     return ctx->callbacks->onBeginObject(ctx->userData);
 }
@@ -542,13 +542,13 @@ ksbonjson_decodeStatus ksbonjson_decode(const uint8_t* const document,
                                         size_t* const decodedOffset)
 {
     DecodeContext ctx =
-    {
-        .bufferStart = document,
-        .bufferCurrent = document,
-        .bufferEnd = document + documentLength,
-        .callbacks = callbacks,
-        .userData = userData,
-    };
+        {
+            .bufferStart = document,
+            .bufferCurrent = document,
+            .bufferEnd = document + documentLength,
+            .callbacks = callbacks,
+            .userData = userData,
+        };
 
     const ksbonjson_decodeStatus result = decodeDocument(&ctx);
     *decodedOffset = (size_t)(ctx.bufferCurrent - ctx.bufferStart);
