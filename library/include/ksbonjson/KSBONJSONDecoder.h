@@ -80,9 +80,9 @@ extern "C" {
 #define TYPEDEF_KSBIGNUMBER
     typedef struct
     {
-        int32_t significand_sign; // 1 or -1
-        int32_t exponent;
         uint64_t significand;     // Unsigned 64-bit absolute value
+        int32_t exponent;
+        int32_t significand_sign; // 1 or -1
     } KSBigNumber;
 
     /**
@@ -96,9 +96,9 @@ extern "C" {
     {
         KSBigNumber n =
         {
-            .significand_sign = (int32_t)sign,
+            .significand = significandAbs,
             .exponent = exponent,
-            .significand = significandAbs
+            .significand_sign = (int32_t)sign,
         };
         return n;
     }
