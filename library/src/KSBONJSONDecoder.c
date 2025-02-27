@@ -475,7 +475,14 @@ static ksbonjson_decodeStatus decodeValue(DecodeContext* const ctx, const uint8_
         case TYPE_OBJECT:
             return beginObject(ctx);
         case TYPE_END:
+        {
+            ContainerState* const container = &ctx->containers[ctx->containerDepth];
+            unlikely_if(container->isObject && !container->isExpectingName)
+            {
+                return KSBONJSON_DECODE_EXPECTED_OBJECT_VALUE;
+            }
             return endContainer(ctx);
+        }
         case TYPE_FALSE:
             return ctx->callbacks->onBoolean(false, ctx->userData);
         case TYPE_TRUE:
@@ -493,11 +500,6 @@ static ksbonjson_decodeStatus decodeDocument(DecodeContext* const ctx)
     {
         ContainerState* const container = &ctx->containers[ctx->containerDepth];
         const uint8_t typeCode = *ctx->bufferCurrent++;
-
-        unlikely_if(typeCode == TYPE_END && container->isObject && !container->isExpectingName)
-        {
-            return KSBONJSON_DECODE_EXPECTED_OBJECT_VALUE;
-        }
 
         if(container->isObject && container->isExpectingName)
         {
