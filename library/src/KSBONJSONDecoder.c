@@ -360,14 +360,9 @@ static ksbonjson_decodeStatus decodeAndReportBigNumber(DecodeContext* const ctx)
 
 static ksbonjson_decodeStatus decodeAndReportShortString(DecodeContext* const ctx, const uint8_t typeCode)
 {
-    const uint8_t* const begin = ctx->bufferCurrent;
     const size_t length = (size_t)(typeCode - TYPE_STRING0);
-
-    unlikely_if(begin + length > ctx->bufferEnd)
-    {
-        return KSBONJSON_DECODE_INCOMPLETE;
-    }
-
+    SHOULD_HAVE_ROOM_FOR_BYTES(length);
+    const uint8_t* const begin = ctx->bufferCurrent;
     ctx->bufferCurrent += length;
     return ctx->callbacks->onString((const char*)begin, length, ctx->userData);
 }
