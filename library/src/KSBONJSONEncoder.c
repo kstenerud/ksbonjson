@@ -425,17 +425,13 @@ ksbonjson_encodeStatus ksbonjson_addFloat(KSBONJSONEncodeContext* const ctx, con
 
 ksbonjson_encodeStatus ksbonjson_addBigNumber(KSBONJSONEncodeContext* const ctx, const KSBigNumber value)
 {
-    const size_t significandByteCount = value.significand == 0 ? 0 : positiveIntegerRequiredBytes(value.significand);
-    const size_t exponentByteCount = exponentRequiredBytes(value.exponent);
-
-    unlikely_if(exponentByteCount > 3)
-    {
-        return KSBONJSON_ENCODE_INVALID_DATA;
-    }
     unlikely_if(value.exponent < -0x800000 || value.exponent > 0x7fffff)
     {
         return KSBONJSON_ENCODE_INVALID_DATA;
     }
+
+    const size_t exponentByteCount = exponentRequiredBytes(value.exponent);
+    const size_t significandByteCount = value.significand == 0 ? 0 : positiveIntegerRequiredBytes(value.significand);
 
     // Type code size:       1 byte
     // Max header size:      1 byte
