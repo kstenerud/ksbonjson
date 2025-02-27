@@ -210,21 +210,13 @@ static ksbonjson_decodeStatus decodeUleb128(DecodeContext* const ctx, uint64_t* 
     int shift = 0;
     do
     {
+        if(shift > 63)
+        {
+            return KSBONJSON_DECODE_TOO_BIG;
+        }
         SHOULD_HAVE_ROOM_FOR_BYTES(1);
         nextByte = *ctx->bufferCurrent++;
-        const uint64_t nextSegment = (nextByte&0x7f);
-        unlikely_if(shift > 58)
-        {
-            unlikely_if(shift > 63)
-            {
-                return KSBONJSON_DECODE_TOO_BIG;
-            }
-            unlikely_if((nextSegment<<shift)>>shift != nextSegment)
-            {
-                return KSBONJSON_DECODE_TOO_BIG;
-            }
-        }
-        value |= nextSegment << shift;
+        value |= (nextByte&0x7f) << shift;
         shift += 7;
     }
     while((nextByte & 0x80) != 0);
