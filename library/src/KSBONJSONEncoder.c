@@ -444,8 +444,8 @@ ksbonjson_encodeStatus ksbonjson_addBigNumber(KSBONJSONEncodeContext* const ctx,
                             (exponentByteCount << 1) |
                             (significandByteCount << 3)
                         );
-    encodeIntegerIntoBytes(value.significand, bytes+2, significandByteCount);
-    encodeIntegerIntoBytes((uint64_t)value.exponent, bytes+2+significandByteCount, exponentByteCount);
+    encodeIntegerIntoBytes((uint64_t)value.exponent, bytes+2, exponentByteCount);
+    encodeIntegerIntoBytes(value.significand, bytes+2+exponentByteCount, significandByteCount);
 
     return addEncodedBytes(ctx, bytes, significandByteCount + exponentByteCount + 2);
 }

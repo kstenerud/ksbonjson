@@ -352,8 +352,8 @@ static ksbonjson_decodeStatus decodeAndReportBigNumber(DecodeContext* const ctx)
     }
 
     SHOULD_HAVE_ROOM_FOR_BYTES(significandLength + exponentLength);
-    const uint64_t significand = decodeUnsignedInt(ctx, significandLength);
     const int32_t exponent = (int32_t)decodeSignedInt(ctx, exponentLength);
+    const uint64_t significand = decodeUnsignedInt(ctx, significandLength);
 
     return ctx->callbacks->onBigNumber(ksbonjson_newBigNumber(sign, significand, exponent), ctx->userData);
 }
