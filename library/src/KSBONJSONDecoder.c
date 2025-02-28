@@ -305,8 +305,9 @@ static ksbonjson_decodeStatus decodeAndReportFloat64(DecodeContext* const ctx)
 
 static ksbonjson_decodeStatus decodeAndReportBigNumber(DecodeContext* const ctx)
 {
-    // We can't handle huge BigNumbers, so no need to handle ULEB128 spanning multiple bytes
-    uint64_t header = decodeUnsignedInt(ctx, 1);
+    // We can't handle huge BigNumbers, so no need to handle ULEB128 header spanning multiple bytes
+    SHOULD_HAVE_ROOM_FOR_BYTES(1);
+    uint8_t header = *ctx->bufferCurrent++;
     if((header & 0x80) != 0)
     {
         return KSBONJSON_DECODE_TOO_BIG;
