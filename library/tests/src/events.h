@@ -172,13 +172,13 @@ protected:
 };
 
 std::ostream &operator<<(std::ostream &os, KSBigNumber const &v) {
-    return os << (v.significand_sign < 0 ? "-" : "")
+    return os << (v.significandSign < 0 ? "-" : "")
     << v.significand << "e" << v.exponent;
 }
 
 bool operator==(KSBigNumber const &l, KSBigNumber const &r) {
     // Just do a naive comparison
-    return l.significand_sign == r.significand_sign &&
+    return l.significandSign == r.significandSign &&
     l.significand == r.significand &&
     l.exponent == r.exponent;
 }

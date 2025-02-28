@@ -82,7 +82,7 @@ extern "C" {
     {
         uint64_t significand;     // Unsigned 64-bit absolute value
         int32_t exponent;         // Signed 24-bit (-0x800000 to 0x7fffff)
-        int32_t significand_sign; // 1 or -1
+        int32_t significandSign; // 1 or -1
     } KSBigNumber;
 
     /**
@@ -98,7 +98,7 @@ extern "C" {
                 {
                     .significand = significandAbs,
                     .exponent = exponent,
-                    .significand_sign = (int32_t)sign,
+                    .significandSign = (int32_t)sign,
                 };
     }
 #endif // TYPEDEF_KSBIGNUMBER

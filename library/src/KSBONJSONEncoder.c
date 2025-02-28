@@ -441,7 +441,7 @@ ksbonjson_encodeStatus ksbonjson_addBigNumber(KSBONJSONEncodeContext* const ctx,
     bytes[0] = TYPE_BIG_NUMBER;
     // In this implementation, header will never be >0b01000111, so no need for full-on ULEB128 encoding
     bytes[1] = (uint8_t)(
-                            ((value.significand_sign >> 31) & 1) |
+                            ((value.significandSign >> 31) & 1) |
                             (exponentByteCount << 1) |
                             (significandByteCount << 3)
                         );
