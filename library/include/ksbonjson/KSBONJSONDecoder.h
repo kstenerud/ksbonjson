@@ -81,7 +81,7 @@ extern "C" {
     typedef struct
     {
         uint64_t significand;     // Unsigned 64-bit absolute value
-        int32_t exponent;
+        int32_t exponent;         // Signed 24-bit (-0x800000 to 0x7fffff)
         int32_t significand_sign; // 1 or -1
     } KSBigNumber;
 
@@ -89,7 +89,7 @@ extern "C" {
      * Create a new Big Number
      * @param sign The sign to apply to the significand: 1 (positive) or -1 (negative)
      * @param significandAbs The absolute value of the significand
-     * @param exponent The exponent
+     * @param exponent The exponent (-0x800000 to 0x7fffff)
      * @return A new Big Number
      */
     static inline KSBigNumber ksbonjson_newBigNumber(int sign, uint64_t significandAbs, int32_t exponent)
