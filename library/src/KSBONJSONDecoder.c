@@ -200,32 +200,6 @@ typedef struct
 // ============================================================================
 
 /**
- * Decode up to 63 bits of ULEB128 data.
- * Returns an error if the data is larger than this.
- */
-static ksbonjson_decodeStatus decodeUleb128(DecodeContext* const ctx, uint64_t* const valuePtr)
-{
-    uint64_t nextByte = 0;
-    uint64_t value = 0;
-    int shift = 0;
-    do
-    {
-        if(shift > 63)
-        {
-            return KSBONJSON_DECODE_TOO_BIG;
-        }
-        SHOULD_HAVE_ROOM_FOR_BYTES(1);
-        nextByte = *ctx->bufferCurrent++;
-        value |= (nextByte&0x7f) << shift;
-        shift += 7;
-    }
-    while((nextByte & 0x80) != 0);
-
-    *valuePtr = value;
-    return KSBONJSON_DECODE_OK;
-}
-
-/**
  * Decode a primitive numeric type of the specified size.
  * @param ctx The context
  * @param byteCount Size of the number in bytes. Do NOT set size > 8 as it isn't sanity checked!
@@ -331,8 +305,12 @@ static ksbonjson_decodeStatus decodeAndReportFloat64(DecodeContext* const ctx)
 
 static ksbonjson_decodeStatus decodeAndReportBigNumber(DecodeContext* const ctx)
 {
-    uint64_t header = 0;
-    PROPAGATE_ERROR(ctx, decodeUleb128(ctx, &header));
+    // We can't handle huge BigNumbers, so no need to handle ULEB128 spanning multiple bytes
+    uint64_t header = decodeUnsignedInt(ctx, 1);
+    if((header & 0x80) != 0)
+    {
+        return KSBONJSON_DECODE_TOO_BIG;
+    }
     const int sign = fillWithBit0((uint8_t)header);
     const size_t exponentLength = (header >> 1) & 3;
     const size_t significandLength = header >> 3;
