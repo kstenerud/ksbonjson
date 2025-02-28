@@ -87,7 +87,7 @@ extern "C" {
 
     /**
      * Create a new Big Number
-     * @param sign The sign to apply to the significand: 1 (positive) or -1 (negative)
+     * @param sign The significand's sign: 1 (positive) or -1 (negative)
      * @param significandAbs The absolute value of the significand
      * @param exponent The exponent (-0x800000 to 0x7fffff)
      * @return A new Big Number
