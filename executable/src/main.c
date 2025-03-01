@@ -523,7 +523,12 @@ static void bonjsonToJson(const char* const src_path, const char* const dst_path
 
     file = openFileForWriting(dst_path);
     const char* jsonDoc = json_object_to_json_string_ext(ctx.stack[0].obj, prettyPrint ? JSON_C_TO_STRING_PRETTY : JSON_C_TO_STRING_PLAIN);
-     writeToFile(file, (const uint8_t*)jsonDoc, strlen(jsonDoc));
+    writeToFile(file, (const uint8_t*)jsonDoc, strlen(jsonDoc));
+    if(prettyPrint)
+    {
+        const uint8_t newline = '\n';
+        writeToFile(file, &newline, 1);
+    }
     closeFile(file);
 }
 
@@ -555,7 +560,7 @@ Options:\n\
   -o <path>: Output file (use - to specify stdout) (default stdout)\n\
   -b: Convert JSON to BONJSON (default)\n\
   -j: Convert BONJSON to JSON\n\
-  -p: Pretty-print (if converting to JSON)\n\
+  -m: Convert BONJSON to minified JSON\n\
 \n\
 ", EXPAND_AND_QUOTE(PROJECT_VERSION), basename(g_argv_0));
 }
@@ -580,7 +585,7 @@ int main(const int argc, char** const argv)
     g_argv_0 = argv[0];
 
     int ch;
-    while((ch = getopt(argc, argv, "?hvbjpi:o:")) >= 0)
+    while((ch = getopt(argc, argv, "?hvbjmi:o:")) >= 0)
     {
         switch(ch)
         {
@@ -596,9 +601,11 @@ int main(const int argc, char** const argv)
                 break;
             case 'j':
                 toJson = true;
-                break;
-            case 'p':
                 prettyPrint = true;
+                break;
+            case 'm':
+                toJson = true;
+                prettyPrint = false;
                 break;
             case 'i':
                 src_path = strdup(optarg);
