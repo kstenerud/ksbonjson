@@ -422,56 +422,68 @@ void assert_decode_failure(std::vector<uint8_t> document)
 
 enum
 {
-    TYPE_FLOAT16    = 0x6b,
-    TYPE_FLOAT32    = 0x6c,
-    TYPE_FLOAT64    = 0x6d,
-    TYPE_FALSE      = 0x6e,
-    TYPE_TRUE       = 0x6f,
-    TYPE_UINT8      = 0x70,
-    TYPE_UINT16     = 0x71,
-    TYPE_UINT24     = 0x72,
-    TYPE_UINT32     = 0x73,
-    TYPE_UINT40     = 0x74,
-    TYPE_UINT48     = 0x75,
-    TYPE_UINT56     = 0x76,
-    TYPE_UINT64     = 0x77,
-    TYPE_SINT8      = 0x78,
-    TYPE_SINT16     = 0x79,
-    TYPE_SINT24     = 0x7a,
-    TYPE_SINT32     = 0x7b,
-    TYPE_SINT40     = 0x7c,
-    TYPE_SINT48     = 0x7d,
-    TYPE_SINT56     = 0x7e,
-    TYPE_SINT64     = 0x7f,
-    TYPE_STRING0    = 0x80,
-    TYPE_STRING1    = 0x81,
-    TYPE_STRING2    = 0x82,
-    TYPE_STRING3    = 0x83,
-    TYPE_STRING4    = 0x84,
-    TYPE_STRING5    = 0x85,
-    TYPE_STRING6    = 0x86,
-    TYPE_STRING7    = 0x87,
-    TYPE_STRING8    = 0x88,
-    TYPE_STRING9    = 0x89,
-    TYPE_STRING10   = 0x8a,
-    TYPE_STRING11   = 0x8b,
-    TYPE_STRING12   = 0x8c,
-    TYPE_STRING13   = 0x8d,
-    TYPE_STRING14   = 0x8e,
-    TYPE_STRING15   = 0x8f,
-    TYPE_STRING     = 0x90,
-    TYPE_BIG_NUMBER = 0x91,
-    TYPE_ARRAY      = 0x92,
-    TYPE_OBJECT     = 0x93,
-    TYPE_END        = 0x94,
-    TYPE_NULL       = 0x95,
+    TYPE_RESERVED_65 = 0x65,
+    TYPE_RESERVED_66 = 0x66,
+    TYPE_RESERVED_67 = 0x67,
+    TYPE_STRING      = 0x68,
+    TYPE_BIG_NUMBER  = 0x69,
+    TYPE_FLOAT16     = 0x6a,
+    TYPE_FLOAT32     = 0x6b,
+    TYPE_FLOAT64     = 0x6c,
+    TYPE_NULL        = 0x6d,
+    TYPE_FALSE       = 0x6e,
+    TYPE_TRUE        = 0x6f,
+    TYPE_UINT8       = 0x70,
+    TYPE_UINT16      = 0x71,
+    TYPE_UINT24      = 0x72,
+    TYPE_UINT32      = 0x73,
+    TYPE_UINT40      = 0x74,
+    TYPE_UINT48      = 0x75,
+    TYPE_UINT56      = 0x76,
+    TYPE_UINT64      = 0x77,
+    TYPE_SINT8       = 0x78,
+    TYPE_SINT16      = 0x79,
+    TYPE_SINT24      = 0x7a,
+    TYPE_SINT32      = 0x7b,
+    TYPE_SINT40      = 0x7c,
+    TYPE_SINT48      = 0x7d,
+    TYPE_SINT56      = 0x7e,
+    TYPE_SINT64      = 0x7f,
+    TYPE_STRING0     = 0x80,
+    TYPE_STRING1     = 0x81,
+    TYPE_STRING2     = 0x82,
+    TYPE_STRING3     = 0x83,
+    TYPE_STRING4     = 0x84,
+    TYPE_STRING5     = 0x85,
+    TYPE_STRING6     = 0x86,
+    TYPE_STRING7     = 0x87,
+    TYPE_STRING8     = 0x88,
+    TYPE_STRING9     = 0x89,
+    TYPE_STRING10    = 0x8a,
+    TYPE_STRING11    = 0x8b,
+    TYPE_STRING12    = 0x8c,
+    TYPE_STRING13    = 0x8d,
+    TYPE_STRING14    = 0x8e,
+    TYPE_STRING15    = 0x8f,
+    TYPE_RESERVED_90 = 0x90,
+    TYPE_RESERVED_91 = 0x91,
+    TYPE_RESERVED_92 = 0x92,
+    TYPE_RESERVED_93 = 0x93,
+    TYPE_RESERVED_94 = 0x94,
+    TYPE_RESERVED_95 = 0x95,
+    TYPE_RESERVED_96 = 0x96,
+    TYPE_RESERVED_97 = 0x97,
+    TYPE_RESERVED_98 = 0x98,
+    TYPE_ARRAY       = 0x99,
+    TYPE_OBJECT      = 0x9a,
+    TYPE_END         = 0x9b,
 };
 
 enum
 {
     STRING_TERMINATOR = 0xff,
-    INTSMALL_NEGATIVE_EDGE = (unsigned char)-106,
-    INTSMALL_POSITIVE_EDGE = 106,
+    SMALLINT_NEGATIVE_EDGE = -100,
+    SMALLINT_POSITIVE_EDGE = 100,
 };
 
 // ------------------------------------
@@ -510,7 +522,6 @@ TEST(EncodeDecode, float64)
 
 TEST(EncodeDecode, smallint)
 {
-    assert_encode_decode({std::make_shared<IntegerEvent>( 106)}, {(uint8_t) 106});
     assert_encode_decode({std::make_shared<IntegerEvent>( 100)}, {(uint8_t) 100});
     assert_encode_decode({std::make_shared<IntegerEvent>(  10)}, {(uint8_t)  10});
     assert_encode_decode({std::make_shared<IntegerEvent>(   0)}, {(uint8_t)   0});
@@ -518,7 +529,6 @@ TEST(EncodeDecode, smallint)
     assert_encode_decode({std::make_shared<IntegerEvent>(  -1)}, {(uint8_t)  -1});
     assert_encode_decode({std::make_shared<IntegerEvent>( -60)}, {(uint8_t) -60});
     assert_encode_decode({std::make_shared<IntegerEvent>(-100)}, {(uint8_t)-100});
-    assert_encode_decode({std::make_shared<IntegerEvent>(-106)}, {(uint8_t)-106});
 }
 
 TEST(EncodeDecode, int8)
@@ -526,13 +536,13 @@ TEST(EncodeDecode, int8)
     assert_encode_decode({std::make_shared<IntegerEvent>( 127)}, {TYPE_SINT8, (uint8_t)( 127)});
     assert_encode_decode({std::make_shared<IntegerEvent>( 126)}, {TYPE_SINT8, (uint8_t)( 126)});
     assert_encode_decode({std::make_shared<IntegerEvent>( 122)}, {TYPE_SINT8, (uint8_t)( 122)});
-    assert_encode_decode({std::make_shared<IntegerEvent>( 107)}, {TYPE_SINT8, (uint8_t)( 107)});
+    assert_encode_decode({std::make_shared<IntegerEvent>( 101)}, {TYPE_SINT8, (uint8_t)( 101)});
 
     assert_encode_decode({std::make_shared<IntegerEvent>( 128)}, {TYPE_UINT8, (uint8_t)( 128)}); 
     assert_encode_decode({std::make_shared<IntegerEvent>( 200)}, {TYPE_UINT8, (uint8_t)( 200)}); 
     assert_encode_decode({std::make_shared<IntegerEvent>( 255)}, {TYPE_UINT8, (uint8_t)( 255)}); 
 
-    assert_encode_decode({std::make_shared<IntegerEvent>(-107)}, {TYPE_SINT8, (uint8_t)(-107)});
+    assert_encode_decode({std::make_shared<IntegerEvent>(-101)}, {TYPE_SINT8, (uint8_t)(-101)});
     assert_encode_decode({std::make_shared<IntegerEvent>(-121)}, {TYPE_SINT8, (uint8_t)(-121)});
     assert_encode_decode({std::make_shared<IntegerEvent>(-123)}, {TYPE_SINT8, (uint8_t)(-123)});
     assert_encode_decode({std::make_shared<IntegerEvent>(-127)}, {TYPE_SINT8, (uint8_t)(-127)});
@@ -766,33 +776,33 @@ TEST(EncodeDecode, int64)
 
 TEST(EncodeDecode, BigNumber)
 {
-    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 0, 0))}, {0x91, 0x00});
-    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 0, 0))}, {0x91, 0x01});
-    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 1, 0))}, {0x91, 0x08, 0x01});
-    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 1, 0))}, {0x91, 0x09, 0x01});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 0, 0))}, {TYPE_BIG_NUMBER, 0x00});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 0, 0))}, {TYPE_BIG_NUMBER, 0x01});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 1, 0))}, {TYPE_BIG_NUMBER, 0x08, 0x01});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 1, 0))}, {TYPE_BIG_NUMBER, 0x09, 0x01});
 
-    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 1,  1))}, {0x91, 0x0a, 0x01, 0x01});
-    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 1,  1))}, {0x91, 0x0b, 0x01, 0x01});
-    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 1, -1))}, {0x91, 0x0a, 0xff, 0x01});
-    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 1, -1))}, {0x91, 0x0b, 0xff, 0x01});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 1,  1))}, {TYPE_BIG_NUMBER, 0x0a, 0x01, 0x01});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 1,  1))}, {TYPE_BIG_NUMBER, 0x0b, 0x01, 0x01});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 1, -1))}, {TYPE_BIG_NUMBER, 0x0a, 0xff, 0x01});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 1, -1))}, {TYPE_BIG_NUMBER, 0x0b, 0xff, 0x01});
 
-    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 0x123, 0))}, {0x91, 0x10, 0x23, 0x01});
-    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 0x123, 0))}, {0x91, 0x11, 0x23, 0x01});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 0x123, 0))}, {TYPE_BIG_NUMBER, 0x10, 0x23, 0x01});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 0x123, 0))}, {TYPE_BIG_NUMBER, 0x11, 0x23, 0x01});
 
-    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 0x123,  0x456))}, {0x91, 0x14, 0x56, 0x04, 0x23, 0x01});
-    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 0x123,  0x456))}, {0x91, 0x15, 0x56, 0x04, 0x23, 0x01});
-    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 0x123, -0x456))}, {0x91, 0x14, 0xaa, 0xfb, 0x23, 0x01});
-    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 0x123, -0x456))}, {0x91, 0x15, 0xaa, 0xfb, 0x23, 0x01});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 0x123,  0x456))}, {TYPE_BIG_NUMBER, 0x14, 0x56, 0x04, 0x23, 0x01});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 0x123,  0x456))}, {TYPE_BIG_NUMBER, 0x15, 0x56, 0x04, 0x23, 0x01});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 0x123, -0x456))}, {TYPE_BIG_NUMBER, 0x14, 0xaa, 0xfb, 0x23, 0x01});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 0x123, -0x456))}, {TYPE_BIG_NUMBER, 0x15, 0xaa, 0xfb, 0x23, 0x01});
 
-    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 1,  0x7fffff))}, {0x91, 0x0e, 0xff, 0xff, 0x7f, 0x01});
-    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 1,  0x7fffff))}, {0x91, 0x0f, 0xff, 0xff, 0x7f, 0x01});
-    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 1, -0x800000))}, {0x91, 0x0e, 0x00, 0x00, 0x80, 0x01});
-    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 1, -0x800000))}, {0x91, 0x0f, 0x00, 0x00, 0x80, 0x01});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 1,  0x7fffff))}, {TYPE_BIG_NUMBER, 0x0e, 0xff, 0xff, 0x7f, 0x01});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 1,  0x7fffff))}, {TYPE_BIG_NUMBER, 0x0f, 0xff, 0xff, 0x7f, 0x01});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 1, -0x800000))}, {TYPE_BIG_NUMBER, 0x0e, 0x00, 0x00, 0x80, 0x01});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 1, -0x800000))}, {TYPE_BIG_NUMBER, 0x0f, 0x00, 0x00, 0x80, 0x01});
 
-    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 0xffffffffffffffff,  0x7fffff))}, {0x91, 0x46, 0xff, 0xff, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff});
-    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 0xffffffffffffffff,  0x7fffff))}, {0x91, 0x47, 0xff, 0xff, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff});
-    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 0xffffffffffffffff, -0x800000))}, {0x91, 0x46, 0x00, 0x00, 0x80, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff});
-    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 0xffffffffffffffff, -0x800000))}, {0x91, 0x47, 0x00, 0x00, 0x80, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 0xffffffffffffffff,  0x7fffff))}, {TYPE_BIG_NUMBER, 0x46, 0xff, 0xff, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 0xffffffffffffffff,  0x7fffff))}, {TYPE_BIG_NUMBER, 0x47, 0xff, 0xff, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 0xffffffffffffffff, -0x800000))}, {TYPE_BIG_NUMBER, 0x46, 0x00, 0x00, 0x80, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 0xffffffffffffffff, -0x800000))}, {TYPE_BIG_NUMBER, 0x47, 0x00, 0x00, 0x80, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff});
 }
 
 TEST(EncodeDecode, short_string)
@@ -1694,6 +1704,21 @@ TEST(Decoder, fail_truncated)
     assert_decode_failure({TYPE_STRING15, 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a'});
 }
 
+TEST(Decoder, fail_invalid_type_code)
+{
+    assert_decode_failure({0x65, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
+    assert_decode_failure({0x66, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
+    assert_decode_failure({0x67, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
+    assert_decode_failure({0x90, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
+    assert_decode_failure({0x91, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
+    assert_decode_failure({0x92, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
+    assert_decode_failure({0x93, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
+    assert_decode_failure({0x94, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
+    assert_decode_failure({0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
+    assert_decode_failure({0x96, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
+    assert_decode_failure({0x97, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
+    assert_decode_failure({0x98, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
+}
 
 // ------------------------------------
 // Example Tests
@@ -1708,16 +1733,15 @@ TEST(Examples, specification)
     assert_encode_decode({std::make_shared<StringEvent>("15 byte string!")},  {0x8f, 0x31, 0x35, 0x20, 0x62, 0x79, 0x74, 0x65, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x21});
 
     // Long String
-    assert_decode({0x90, 0xff}, {std::make_shared<StringEvent>("")});
-    assert_decode({0x90, 0x61, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0xff}, {std::make_shared<StringEvent>("a string")});
+    assert_decode({0x68, 0xff}, {std::make_shared<StringEvent>("")});
+    assert_decode({0x68, 0x61, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0xff}, {std::make_shared<StringEvent>("a string")});
 
     // Small Integer
-    assert_encode_decode({std::make_shared<IntegerEvent>( 106)},  {0x6a});
+    assert_encode_decode({std::make_shared<IntegerEvent>( 100)},  {0x64});
     assert_encode_decode({std::make_shared<IntegerEvent>(   5)},  {0x05});
     assert_encode_decode({std::make_shared<IntegerEvent>(   0)},  {0x00});
     assert_encode_decode({std::make_shared<IntegerEvent>( -60)},  {0xc4});
     assert_encode_decode({std::make_shared<IntegerEvent>(-100)},  {0x9c});
-    assert_encode_decode({std::make_shared<IntegerEvent>(-106)},  {0x96});
 
     // Integer
     assert_decode({0x70, 0xb4}, {std::make_shared<IntegerEvent>(180)});
@@ -1728,17 +1752,17 @@ TEST(Examples, specification)
     assert_decode({0x77, 0xda, 0xda, 0xda, 0xde, 0xd0, 0xd0, 0xd0, 0xde}, {std::make_shared<UIntegerEvent>(0xded0d0d0dedadada)});
 
     // 16 Bit Float
-    assert_encode_decode({std::make_shared<FloatEvent>(1.125)},  {0x6b, 0x90, 0x3f});
+    assert_encode_decode({std::make_shared<FloatEvent>(1.125)},  {0x6a, 0x90, 0x3f});
 
     // 32 Bit Float
-    assert_encode_decode({std::make_shared<FloatEvent>(0x1.3f7p5)},  {0x6c, 0x00, 0xb8, 0x1f, 0x42});
+    assert_encode_decode({std::make_shared<FloatEvent>(0x1.3f7p5)},  {0x6b, 0x00, 0xb8, 0x1f, 0x42});
 
     // 64 Bit Float
-    assert_encode_decode({std::make_shared<FloatEvent>(1.234)},  {0x6d, 0x58, 0x39, 0xb4, 0xc8, 0x76, 0xbe, 0xf3, 0x3f});
+    assert_encode_decode({std::make_shared<FloatEvent>(1.234)},  {0x6c, 0x58, 0x39, 0xb4, 0xc8, 0x76, 0xbe, 0xf3, 0x3f});
 
     // Big Number
-    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(1, 15, -1))},  {0x91, 0x0a, 0xff, 0x0f});
-    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 0, 0))},  {0x91, 0x01});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(1, 15, -1))},  {0x69, 0x0a, 0xff, 0x0f});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 0, 0))},  {0x69, 0x01});
 
     // Array
     assert_encode_decode(
@@ -1750,11 +1774,11 @@ TEST(Examples, specification)
         std::make_shared<ContainerEndEvent>(),
     },
     {
-        0x92,
+        0x99,
             0x81, 0x61,
             0x01,
-            0x95,
-        0x94,
+            0x6d,
+        0x9b,
     });
 
     // Object
@@ -1768,12 +1792,12 @@ TEST(Examples, specification)
         std::make_shared<ContainerEndEvent>(),
     },
     {
-        0x93,
+        0x9a,
             0x81, 0x62,
             0x00,
             0x84, 0x74, 0x65, 0x73, 0x74,
             0x81, 0x78,
-        0x94,
+        0x9b,
     });
 
     // Boolean
@@ -1781,7 +1805,7 @@ TEST(Examples, specification)
     assert_encode_decode({std::make_shared<BooleanEvent>(true)}, {0x6f});
 
     // Null
-    assert_encode_decode({std::make_shared<NullEvent>()}, {0x95});
+    assert_encode_decode({std::make_shared<NullEvent>()}, {0x6d});
 
     // Full Example
     assert_encode_decode(
@@ -1809,30 +1833,30 @@ TEST(Examples, specification)
         std::make_shared<ContainerEndEvent>(),
     },
     {
-        0x93,
+        0x9a,
             0x86, 0x6e, 0x75, 0x6d, 0x62, 0x65, 0x72,
             0x01,
             0x85, 0x61, 0x72, 0x72, 0x61, 0x79,
-            0x92,
+            0x99,
                 0x81, 0x78,
                 0x79, 0xe8, 0x03,
-                0x6b, 0xc0, 0x3f,
-            0x94,
+                0x6a, 0xc0, 0x3f,
+            0x9b,
             0x84, 0x6e, 0x75, 0x6c, 0x6c,
-            0x95,
+            0x6d,
             0x87, 0x62, 0x6f, 0x6f, 0x6c, 0x65, 0x61, 0x6e,
             0x6f,
             0x86, 0x6f, 0x62, 0x6a, 0x65, 0x63, 0x74,
-            0x93,
+            0x9a,
                 0x8f, 0x6e, 0x65, 0x67, 0x61, 0x74, 0x69, 0x76, 0x65, 0x20, 0x6e, 0x75, 0x6d, 0x62, 0x65, 0x72,
                 0x9c,
                 0x8b, 0x6c, 0x6f, 0x6e, 0x67, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
-                0x90, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30,
+                0x68, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30,
                       0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30,
                       0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30,
                       0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30,
                 0xff,
-            0x94,
-        0x94,
+            0x9b,
+        0x9b,
     });
 }
