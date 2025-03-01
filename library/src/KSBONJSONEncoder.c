@@ -445,13 +445,14 @@ ksbonjson_encodeStatus ksbonjson_addBigNumber(KSBONJSONEncodeContext* const ctx,
     const size_t exponentByteCount = exponentRequiredBytes(value.exponent);
     const size_t significandByteCount = value.significand == 0 ? 0 : positiveIntegerRequiredBytes(value.significand);
 
-    // Type code size:       1 byte
-    // Max header size:      1 byte
-    // Max significand size: 8 bytes
-    // Max exponent size:    3 bytes
+    //   Header Byte
+    // ───────────────
+    // S S S S S E E N
+    // ╰─┴─┼─┴─╯ ╰─┤ ╰─> Significand sign (0 = positive, 1 = negative)
+    //     │       ╰───> Exponent Length (0-3 bytes)
+    //     ╰───────────> Significand Length (0-31 bytes, but will never exceed 8)
     uint8_t bytes[13];
     bytes[0] = TYPE_BIG_NUMBER;
-    // In this implementation, header will never be >0b01000111, so no need for full-on ULEB128 encoding
     bytes[1] = (uint8_t)(
                             ((value.significandSign >> 31) & 1) |
                             (exponentByteCount << 1) |

@@ -317,13 +317,14 @@ static ksbonjson_decodeStatus decodeAndReportFloat64(DecodeContext* const ctx)
 
 static ksbonjson_decodeStatus decodeAndReportBigNumber(DecodeContext* const ctx)
 {
-    // We can't handle huge BigNumbers, so no need to handle ULEB128 header spanning multiple bytes
     SHOULD_HAVE_ROOM_FOR_BYTES(1);
-    uint8_t header = *ctx->bufferCurrent++;
-    if((header & 0x80) != 0)
-    {
-        return KSBONJSON_DECODE_TOO_BIG;
-    }
+    const uint8_t header = *ctx->bufferCurrent++;
+    //   Header Byte
+    // ───────────────
+    // S S S S S E E N
+    // ╰─┴─┼─┴─╯ ╰─┤ ╰─> Significand sign (0 = positive, 1 = negative)
+    //     │       ╰───> Exponent Length (0-3 bytes)
+    //     ╰───────────> Significand Length (0-31 bytes)
     const int sign = fillWithBit0((uint8_t)header);
     const size_t exponentLength = (header >> 1) & 3;
     const size_t significandLength = header >> 3;
@@ -336,7 +337,7 @@ static ksbonjson_decodeStatus decodeAndReportBigNumber(DecodeContext* const ctx)
     {
         unlikely_if(exponentLength != 0)
         {
-            // Inf or NaN
+            // Special BigNumber encodings: Inf or NaN
             return KSBONJSON_DECODE_INVALID_DATA;
         }
         return ctx->callbacks->onBigNumber(ksbonjson_newBigNumber(sign, 0, 0), ctx->userData);
