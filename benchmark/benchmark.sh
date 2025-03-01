@@ -22,7 +22,7 @@ json-benchmark() {
         local src_file=$1
         local dst_file=$2
         introduce-benchmark "JSON" "$src_file"
-        cat "$src_file" | jq > "$dst_file"
+        cat "$src_file" | jq -c > "$dst_file"
 }
 
 bonjson-benchmark() {

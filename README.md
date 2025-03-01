@@ -26,7 +26,7 @@ Points of Interest
 Last Benchmark Run
 ------------------
 
-(using jq for JSON benchmark)
+Benchmarking vs [jq](https://github.com/jqlang/jq) on [large-file](https://github.com/json-iterator/test-data/blob/master/large-file.json)
 
     ~/ksbonjson/benchmark$ ./benchmark.sh large-file
 
@@ -38,6 +38,6 @@ Last Benchmark Run
 
     Benchmarking JSON decode+encode with 25532k file large-file.json
 
-    real    0m0.821s
-    user    0m0.763s
-    sys     0m0.070s
+    real    0m0.747s
+    user    0m0.689s
+    sys     0m0.073s
