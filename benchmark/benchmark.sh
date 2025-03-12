@@ -21,14 +21,12 @@ introduce-benchmark() {
 json-benchmark() {
         local src_file=$1
         local dst_file=$2
-        introduce-benchmark "JSON" "$src_file"
         cat "$src_file" | jq -c > "$dst_file"
 }
 
 bonjson-benchmark() {
         local src_file=$1
         local dst_file=$2
-        introduce-benchmark "BONJSON" "$src_file"
         cat "$src_file" | ./build/bonjson-benchmark > "$dst_file"
 }
 
@@ -38,8 +36,15 @@ JSON_TMPFILE=$(mktemp /tmp/json-benchmark.XXXXXX.json)
 rm -f "$BONJSON_TMPFILE"
 rm -f "$JSON_TMPFILE"
 
+introduce-benchmark "BONJSON" "${SRC_FILE}.bjn"
 time bonjson-benchmark "${SRC_FILE}.bjn" "$BONJSON_TMPFILE"
-time json-benchmark "${SRC_FILE}.json" "$BONJSON_TMPFILE"
+# ls -l "$BONJSON_TMPFILE"
+
+introduce-benchmark "JSON" "${SRC_FILE}.json"
+time json-benchmark "${SRC_FILE}.json" "$JSON_TMPFILE"
+# ls -l "$JSON_TMPFILE"
 
 rm -f "$BONJSON_TMPFILE"
 rm -f "$JSON_TMPFILE"
+
+echo

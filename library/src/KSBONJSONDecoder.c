@@ -25,9 +25,7 @@
 //
 
 #include <ksbonjson/KSBONJSONDecoder.h>
-#include <string.h> // For memcpy()
-
-#pragma GCC diagnostic ignored "-Wpadded"
+#include <string.h> // For memcpy() and memchr()
 
 
 // ============================================================================
@@ -77,72 +75,50 @@
 #  endif
 #endif // KSBONJSON_IS_LITTLE_ENDIAN
 
+#ifndef HAS_BUILTIN
+#   ifdef _MSC_VER
+#       define HAS_BUILTIN(A) 0
+#   else
+#       define HAS_BUILTIN(A) __has_builtin(A)
+#   endif
+#endif
+
 // Compiler hints for "if" statements
-// #define likely_if(x) if(__builtin_expect(x,1))
-#define unlikely_if(x) if(__builtin_expect(x,0))
+#ifndef likely_if
+#   pragma GCC diagnostic ignored "-Wunused-macros"
+#   if HAS_BUILTIN(__builtin_expect)
+#       define likely_if(x) if(__builtin_expect(x,1))
+#       define unlikely_if(x) if(__builtin_expect(x,0))
+#   else
+#       define likely_if(x) if(x)
+#       define unlikely_if(x) if(x)
+#   endif
+#   pragma GCC diagnostic pop
+#endif
 
 
 // ============================================================================
-// Types (synced with encoder)
+// Constants (synced with encoder)
 // ============================================================================
 
 enum
 {
-    TYPE_RESERVED_65 = 0x65,
-    TYPE_RESERVED_66 = 0x66,
-    TYPE_RESERVED_67 = 0x67,
-    TYPE_STRING      = 0x68,
-    TYPE_BIG_NUMBER  = 0x69,
-    TYPE_FLOAT16     = 0x6a,
-    TYPE_FLOAT32     = 0x6b,
-    TYPE_FLOAT64     = 0x6c,
-    TYPE_NULL        = 0x6d,
-    TYPE_FALSE       = 0x6e,
-    TYPE_TRUE        = 0x6f,
-    TYPE_UINT8       = 0x70,
-    TYPE_UINT16      = 0x71,
-    TYPE_UINT24      = 0x72,
-    TYPE_UINT32      = 0x73,
-    TYPE_UINT40      = 0x74,
-    TYPE_UINT48      = 0x75,
-    TYPE_UINT56      = 0x76,
-    TYPE_UINT64      = 0x77,
-    TYPE_SINT8       = 0x78,
-    TYPE_SINT16      = 0x79,
-    TYPE_SINT24      = 0x7a,
-    TYPE_SINT32      = 0x7b,
-    TYPE_SINT40      = 0x7c,
-    TYPE_SINT48      = 0x7d,
-    TYPE_SINT56      = 0x7e,
-    TYPE_SINT64      = 0x7f,
-    TYPE_STRING0     = 0x80,
-    TYPE_STRING1     = 0x81,
-    TYPE_STRING2     = 0x82,
-    TYPE_STRING3     = 0x83,
-    TYPE_STRING4     = 0x84,
-    TYPE_STRING5     = 0x85,
-    TYPE_STRING6     = 0x86,
-    TYPE_STRING7     = 0x87,
-    TYPE_STRING8     = 0x88,
-    TYPE_STRING9     = 0x89,
-    TYPE_STRING10    = 0x8a,
-    TYPE_STRING11    = 0x8b,
-    TYPE_STRING12    = 0x8c,
-    TYPE_STRING13    = 0x8d,
-    TYPE_STRING14    = 0x8e,
-    TYPE_STRING15    = 0x8f,
-    TYPE_RESERVED_90 = 0x90,
-    TYPE_RESERVED_91 = 0x91,
-    TYPE_RESERVED_92 = 0x92,
-    TYPE_RESERVED_93 = 0x93,
-    TYPE_RESERVED_94 = 0x94,
-    TYPE_RESERVED_95 = 0x95,
-    TYPE_RESERVED_96 = 0x96,
-    TYPE_RESERVED_97 = 0x97,
-    TYPE_RESERVED_98 = 0x98,
-    TYPE_ARRAY       = 0x99,
-    TYPE_OBJECT      = 0x9a,
-    TYPE_END         = 0x9b,
+    /* SMALLINT   96 = 0x60 */ TYPE_UINT8  = 0x70,   TYPE_STRING0  = 0x80,   TYPE_RESERVED_90 = 0x90,
+    /* SMALLINT   97 = 0x61 */ TYPE_UINT16 = 0x71,   TYPE_STRING1  = 0x81,   TYPE_RESERVED_91 = 0x91,
+    /* SMALLINT   98 = 0x62 */ TYPE_UINT24 = 0x72,   TYPE_STRING2  = 0x82,   TYPE_RESERVED_92 = 0x92,
+    /* SMALLINT   99 = 0x63 */ TYPE_UINT32 = 0x73,   TYPE_STRING3  = 0x83,   TYPE_RESERVED_93 = 0x93,
+    /* SMALLINT  100 = 0x64 */ TYPE_UINT40 = 0x74,   TYPE_STRING4  = 0x84,   TYPE_RESERVED_94 = 0x94,
+    TYPE_RESERVED_65 = 0x65,   TYPE_UINT48 = 0x75,   TYPE_STRING5  = 0x85,   TYPE_RESERVED_95 = 0x95,
+    TYPE_RESERVED_66 = 0x66,   TYPE_UINT56 = 0x76,   TYPE_STRING6  = 0x86,   TYPE_RESERVED_96 = 0x96,
+    TYPE_RESERVED_67 = 0x67,   TYPE_UINT64 = 0x77,   TYPE_STRING7  = 0x87,   TYPE_RESERVED_97 = 0x97,
+    TYPE_STRING      = 0x68,   TYPE_SINT8  = 0x78,   TYPE_STRING8  = 0x88,   TYPE_RESERVED_98 = 0x98,
+    TYPE_BIG_NUMBER  = 0x69,   TYPE_SINT16 = 0x79,   TYPE_STRING9  = 0x89,   TYPE_ARRAY       = 0x99,
+    TYPE_FLOAT16     = 0x6a,   TYPE_SINT24 = 0x7a,   TYPE_STRING10 = 0x8a,   TYPE_OBJECT      = 0x9a,
+    TYPE_FLOAT32     = 0x6b,   TYPE_SINT32 = 0x7b,   TYPE_STRING11 = 0x8b,   TYPE_END         = 0x9b,
+    TYPE_FLOAT64     = 0x6c,   TYPE_SINT40 = 0x7c,   TYPE_STRING12 = 0x8c,   /* SMALLINT -100 = 0x9c */
+    TYPE_NULL        = 0x6d,   TYPE_SINT48 = 0x7d,   TYPE_STRING13 = 0x8d,   /* SMALLINT  -99 = 0x9d */
+    TYPE_FALSE       = 0x6e,   TYPE_SINT56 = 0x7e,   TYPE_STRING14 = 0x8e,   /* SMALLINT  -98 = 0x9e */
+    TYPE_TRUE        = 0x6f,   TYPE_SINT64 = 0x7f,   TYPE_STRING15 = 0x8f,   /* SMALLINT  -97 = 0x9f */
 };
 
 enum
@@ -151,6 +127,11 @@ enum
     SMALLINT_NEGATIVE_EDGE = -100,
     SMALLINT_POSITIVE_EDGE = 100,
 };
+
+
+// ============================================================================
+// Types
+// ============================================================================
 
 union number_bits
 {
@@ -162,17 +143,12 @@ union number_bits
     double   f64;
 };
 
-
-// ============================================================================
-// Types (internal)
-// ============================================================================
-
+#pragma GCC diagnostic ignored "-Wpadded"
 typedef struct
 {
     uint8_t isObject: 1;
     uint8_t isExpectingName: 1;
     uint8_t isChunkingString: 1;
-    uint8_t unused: 5;
 } ContainerState;
 
 typedef struct
@@ -185,6 +161,7 @@ typedef struct
     int containerDepth;
     ContainerState containers[KSBONJSON_MAX_CONTAINER_DEPTH];
 } DecodeContext;
+#pragma GCC diagnostic pop
 
 
 // ============================================================================
@@ -211,6 +188,18 @@ typedef struct
 // Utility
 // ============================================================================
 
+static uint64_t fromLittleEndian(uint64_t v)
+{
+#if KSBONJSON_IS_LITTLE_ENDIAN
+    return v;
+#else
+    // Most compilers optimize this to a byte-swap instruction
+	return (v>>56) | ((v&0x00ff000000000000ULL)>>40) | ((v&0x0000ff0000000000ULL)>>24) |
+		   ((v&0x000000ff00000000ULL)>> 8) | ((v&0x00000000ff000000ULL)<< 8) |
+		   (v<<56) | ((v&0x000000000000ff00ULL)<<40) | ((v&0x0000000000ff0000ULL)<<24);
+#endif
+}
+
 /**
  * Decode a primitive numeric type of the specified size.
  * @param ctx The context
@@ -224,14 +213,8 @@ static union number_bits decodePrimitiveNumeric(DecodeContext* const ctx,
     union number_bits bits = {.u64 = (uint64_t)initValue};
     const uint8_t* buf = ctx->bufferCurrent;
     ctx->bufferCurrent += byteCount;
-#if KSBONJSON_IS_LITTLE_ENDIAN
     memcpy(bits.b, buf, byteCount);
-#else
-    for(int i = (int)byteCount-1; i >= 0; i--)
-    {
-        bits.u64 = (bits.u64 << 8) | buf[i];
-    }
-#endif
+    bits.u64 = fromLittleEndian(bits.u64);
     return bits;
 }
 
@@ -319,12 +302,14 @@ static ksbonjson_decodeStatus decodeAndReportBigNumber(DecodeContext* const ctx)
 {
     SHOULD_HAVE_ROOM_FOR_BYTES(1);
     const uint8_t header = *ctx->bufferCurrent++;
+
     //   Header Byte
     // ───────────────
     // S S S S S E E N
     // ╰─┴─┼─┴─╯ ╰─┤ ╰─> Significand sign (0 = positive, 1 = negative)
     //     │       ╰───> Exponent Length (0-3 bytes)
     //     ╰───────────> Significand Length (0-31 bytes)
+
     const int sign = fillWithBit0((uint8_t)header);
     const size_t exponentLength = (header >> 1) & 3;
     const size_t significandLength = header >> 3;
@@ -363,19 +348,16 @@ static ksbonjson_decodeStatus decodeAndReportLongString(DecodeContext* const ctx
 {
     const uint8_t* const begin = ctx->bufferCurrent;
     const uint8_t* const end = ctx->bufferEnd;
-    const uint8_t* pos = begin;
 
-    for(; pos < end; pos++)
+    const uint8_t* found = (const uint8_t*)memchr(begin, STRING_TERMINATOR, (size_t)(end-begin));
+    unlikely_if(found == 0)
     {
-        unlikely_if(*pos == STRING_TERMINATOR)
-        {
-            const size_t length = (size_t)(pos - ctx->bufferCurrent);
-            ctx->bufferCurrent += length + 1;
-            return ctx->callbacks->onString((const char*)begin, length, ctx->userData);
-        }
+        return KSBONJSON_DECODE_INCOMPLETE;
     }
 
-    return KSBONJSON_DECODE_INCOMPLETE;
+    const size_t length = (size_t)(found - ctx->bufferCurrent);
+    ctx->bufferCurrent += length + 1;
+    return ctx->callbacks->onString((const char*)begin, length, ctx->userData);
 }
 
 static ksbonjson_decodeStatus beginArray(DecodeContext* const ctx)
@@ -469,7 +451,7 @@ static ksbonjson_decodeStatus decodeValue(DecodeContext* const ctx, const uint8_
         case TYPE_END:
         {
             ContainerState* const container = &ctx->containers[ctx->containerDepth];
-            unlikely_if(container->isObject && !container->isExpectingName)
+            unlikely_if((container->isObject & !container->isExpectingName))
             {
                 return KSBONJSON_DECODE_EXPECTED_OBJECT_VALUE;
             }
@@ -498,7 +480,7 @@ static ksbonjson_decodeStatus decodeDocument(DecodeContext* const ctx)
         ContainerState* const container = &ctx->containers[ctx->containerDepth];
         const uint8_t typeCode = *ctx->bufferCurrent++;
 
-        if(container->isObject && container->isExpectingName)
+        if((container->isObject & container->isExpectingName))
         {
             PROPAGATE_ERROR(ctx, decodeObjectName(ctx, typeCode));
         }

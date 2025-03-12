@@ -25,7 +25,6 @@
 //
 
 #include <ksbonjson/KSBONJSONEncoder.h>
-#include <stddef.h> // For NULL
 #include <string.h> // For memcpy()
 
 
@@ -76,72 +75,50 @@
 #  endif
 #endif // KSBONJSON_IS_LITTLE_ENDIAN
 
+#ifndef HAS_BUILTIN
+#   ifdef _MSC_VER
+#       define HAS_BUILTIN(A) 0
+#   else
+#       define HAS_BUILTIN(A) __has_builtin(A)
+#   endif
+#endif
+
 // Compiler hints for "if" statements
-#define likely_if(x) if(__builtin_expect(x,1))
-#define unlikely_if(x) if(__builtin_expect(x,0))
+#ifndef likely_if
+#   pragma GCC diagnostic ignored "-Wunused-macros"
+#   if HAS_BUILTIN(__builtin_expect)
+#       define likely_if(x) if(__builtin_expect(x,1))
+#       define unlikely_if(x) if(__builtin_expect(x,0))
+#   else
+#       define likely_if(x) if(x)
+#       define unlikely_if(x) if(x)
+#   endif
+#   pragma GCC diagnostic pop
+#endif
 
 
 // ============================================================================
-// Types (synced with decoder)
+// Constants (synced with decoder)
 // ============================================================================
 
 enum
 {
-    TYPE_RESERVED_65 = 0x65,
-    TYPE_RESERVED_66 = 0x66,
-    TYPE_RESERVED_67 = 0x67,
-    TYPE_STRING      = 0x68,
-    TYPE_BIG_NUMBER  = 0x69,
-    TYPE_FLOAT16     = 0x6a,
-    TYPE_FLOAT32     = 0x6b,
-    TYPE_FLOAT64     = 0x6c,
-    TYPE_NULL        = 0x6d,
-    TYPE_FALSE       = 0x6e,
-    TYPE_TRUE        = 0x6f,
-    TYPE_UINT8       = 0x70,
-    TYPE_UINT16      = 0x71,
-    TYPE_UINT24      = 0x72,
-    TYPE_UINT32      = 0x73,
-    TYPE_UINT40      = 0x74,
-    TYPE_UINT48      = 0x75,
-    TYPE_UINT56      = 0x76,
-    TYPE_UINT64      = 0x77,
-    TYPE_SINT8       = 0x78,
-    TYPE_SINT16      = 0x79,
-    TYPE_SINT24      = 0x7a,
-    TYPE_SINT32      = 0x7b,
-    TYPE_SINT40      = 0x7c,
-    TYPE_SINT48      = 0x7d,
-    TYPE_SINT56      = 0x7e,
-    TYPE_SINT64      = 0x7f,
-    TYPE_STRING0     = 0x80,
-    TYPE_STRING1     = 0x81,
-    TYPE_STRING2     = 0x82,
-    TYPE_STRING3     = 0x83,
-    TYPE_STRING4     = 0x84,
-    TYPE_STRING5     = 0x85,
-    TYPE_STRING6     = 0x86,
-    TYPE_STRING7     = 0x87,
-    TYPE_STRING8     = 0x88,
-    TYPE_STRING9     = 0x89,
-    TYPE_STRING10    = 0x8a,
-    TYPE_STRING11    = 0x8b,
-    TYPE_STRING12    = 0x8c,
-    TYPE_STRING13    = 0x8d,
-    TYPE_STRING14    = 0x8e,
-    TYPE_STRING15    = 0x8f,
-    TYPE_RESERVED_90 = 0x90,
-    TYPE_RESERVED_91 = 0x91,
-    TYPE_RESERVED_92 = 0x92,
-    TYPE_RESERVED_93 = 0x93,
-    TYPE_RESERVED_94 = 0x94,
-    TYPE_RESERVED_95 = 0x95,
-    TYPE_RESERVED_96 = 0x96,
-    TYPE_RESERVED_97 = 0x97,
-    TYPE_RESERVED_98 = 0x98,
-    TYPE_ARRAY       = 0x99,
-    TYPE_OBJECT      = 0x9a,
-    TYPE_END         = 0x9b,
+    /* SMALLINT   96 = 0x60 */ TYPE_UINT8  = 0x70,   TYPE_STRING0  = 0x80,   TYPE_RESERVED_90 = 0x90,
+    /* SMALLINT   97 = 0x61 */ TYPE_UINT16 = 0x71,   TYPE_STRING1  = 0x81,   TYPE_RESERVED_91 = 0x91,
+    /* SMALLINT   98 = 0x62 */ TYPE_UINT24 = 0x72,   TYPE_STRING2  = 0x82,   TYPE_RESERVED_92 = 0x92,
+    /* SMALLINT   99 = 0x63 */ TYPE_UINT32 = 0x73,   TYPE_STRING3  = 0x83,   TYPE_RESERVED_93 = 0x93,
+    /* SMALLINT  100 = 0x64 */ TYPE_UINT40 = 0x74,   TYPE_STRING4  = 0x84,   TYPE_RESERVED_94 = 0x94,
+    TYPE_RESERVED_65 = 0x65,   TYPE_UINT48 = 0x75,   TYPE_STRING5  = 0x85,   TYPE_RESERVED_95 = 0x95,
+    TYPE_RESERVED_66 = 0x66,   TYPE_UINT56 = 0x76,   TYPE_STRING6  = 0x86,   TYPE_RESERVED_96 = 0x96,
+    TYPE_RESERVED_67 = 0x67,   TYPE_UINT64 = 0x77,   TYPE_STRING7  = 0x87,   TYPE_RESERVED_97 = 0x97,
+    TYPE_STRING      = 0x68,   TYPE_SINT8  = 0x78,   TYPE_STRING8  = 0x88,   TYPE_RESERVED_98 = 0x98,
+    TYPE_BIG_NUMBER  = 0x69,   TYPE_SINT16 = 0x79,   TYPE_STRING9  = 0x89,   TYPE_ARRAY       = 0x99,
+    TYPE_FLOAT16     = 0x6a,   TYPE_SINT24 = 0x7a,   TYPE_STRING10 = 0x8a,   TYPE_OBJECT      = 0x9a,
+    TYPE_FLOAT32     = 0x6b,   TYPE_SINT32 = 0x7b,   TYPE_STRING11 = 0x8b,   TYPE_END         = 0x9b,
+    TYPE_FLOAT64     = 0x6c,   TYPE_SINT40 = 0x7c,   TYPE_STRING12 = 0x8c,   /* SMALLINT -100 = 0x9c */
+    TYPE_NULL        = 0x6d,   TYPE_SINT48 = 0x7d,   TYPE_STRING13 = 0x8d,   /* SMALLINT  -99 = 0x9d */
+    TYPE_FALSE       = 0x6e,   TYPE_SINT56 = 0x7e,   TYPE_STRING14 = 0x8e,   /* SMALLINT  -98 = 0x9e */
+    TYPE_TRUE        = 0x6f,   TYPE_SINT64 = 0x7f,   TYPE_STRING15 = 0x8f,   /* SMALLINT  -97 = 0x9f */
 };
 
 enum
@@ -151,13 +128,21 @@ enum
     SMALLINT_POSITIVE_EDGE = 100,
 };
 
-union number_bits
+
+// ============================================================================
+// Types
+// ============================================================================
+
+union num32_bits
+{
+    float f32;
+    uint32_t u32;
+};
+
+union num64_bits
 {
     uint8_t  b[8];
-    uint32_t u32;
     uint64_t u64;
-    int64_t  i64;
-    float    f32;
     double   f64;
 };
 
@@ -177,26 +162,37 @@ union number_bits
     } \
     while(0)
 
-#define SHOULD_NOT_BE_EXPECTING_OBJECT_NAME(CONTAINER) \
-    unlikely_if((CONTAINER)->isObject && (CONTAINER)->isExpectingName) \
-        return KSBONJSON_ENCODE_EXPECTED_OBJECT_NAME
-
-#define SHOULD_NOT_BE_EXPECTING_OBJECT_VALUE(CONTAINER) \
-    unlikely_if((CONTAINER)->isObject && !(CONTAINER)->isExpectingName) \
-        return KSBONJSON_ENCODE_EXPECTED_OBJECT_VALUE
-
-#define SHOULD_NOT_BE_CHUNKING_STRING(CONTAINER) \
-    unlikely_if((CONTAINER)->isChunkingString) \
-        return KSBONJSON_ENCODE_CHUNKING_STRING
-
 #define SHOULD_NOT_BE_NULL(VALUE) \
-    unlikely_if((VALUE) == NULL) \
+    unlikely_if((VALUE) == 0) \
         return KSBONJSON_ENCODE_NULL_POINTER
 
+#define SHOULD_NOT_BE_NULL_OR_CHUNKING_STRING(CONTAINER, VALUE) \
+    unlikely_if(((!(VALUE)) | (CONTAINER)->isChunkingString)) \
+        return (CONTAINER)->isChunkingString ? KSBONJSON_ENCODE_CHUNKING_STRING : KSBONJSON_ENCODE_NULL_POINTER
+
+#define SHOULD_NOT_BE_EXPECTING_OBJECT_NAME_OR_CHUNKING_STRING(CONTAINER) \
+    unlikely_if((((CONTAINER)->isObject & (CONTAINER)->isExpectingName) | (CONTAINER)->isChunkingString)) \
+        return (CONTAINER)->isChunkingString ? KSBONJSON_ENCODE_CHUNKING_STRING : KSBONJSON_ENCODE_EXPECTED_OBJECT_NAME
+
+#define SHOULD_NOT_BE_EXPECTING_OBJECT_VALUE_OR_CHUNKING_STRING(CONTAINER) \
+    unlikely_if((((CONTAINER)->isObject & !(CONTAINER)->isExpectingName) | (CONTAINER)->isChunkingString)) \
+        return (CONTAINER)->isChunkingString ? KSBONJSON_ENCODE_CHUNKING_STRING : KSBONJSON_ENCODE_EXPECTED_OBJECT_NAME
 
 // ============================================================================
 // Utility
 // ============================================================================
+
+static uint64_t toLittleEndian(uint64_t v)
+{
+#if KSBONJSON_IS_LITTLE_ENDIAN
+    return v;
+#else
+    // Most compilers optimize this to a byte-swap instruction
+	return (v>>56) | ((v&0x00ff000000000000ULL)>>40) | ((v&0x0000ff0000000000ULL)>>24) |
+		   ((v&0x000000ff00000000ULL)>> 8) | ((v&0x00000000ff000000ULL)<< 8) |
+		   (v<<56) | ((v&0x000000000000ff00ULL)<<40) | ((v&0x0000000000ff0000ULL)<<24);
+#endif
+}
 
 static KSBONJSONContainerState* getContainer(KSBONJSONEncodeContext* const ctx)
 {
@@ -220,8 +216,7 @@ static ksbonjson_encodeStatus beginContainer(KSBONJSONEncodeContext* const ctx,
                                              const KSBONJSONContainerState containerState)
 {
     KSBONJSONContainerState* const container = getContainer(ctx);
-    SHOULD_NOT_BE_EXPECTING_OBJECT_NAME(container);
-    SHOULD_NOT_BE_CHUNKING_STRING(container);
+    SHOULD_NOT_BE_EXPECTING_OBJECT_NAME_OR_CHUNKING_STRING(container);
     container->isExpectingName = true;
 
     ctx->containerDepth++;
@@ -232,15 +227,8 @@ static ksbonjson_encodeStatus beginContainer(KSBONJSONEncodeContext* const ctx,
 
 static void encodeIntegerIntoBytes(uint64_t value, uint8_t* bytes, size_t byteCount)
 {
-#if KSBONJSON_IS_LITTLE_ENDIAN
+    value = toLittleEndian(value);
     memcpy(bytes, &value, byteCount);
-#else
-    for(size_t i = 0; i < byteCount; i++)
-    {
-        *bytes++ = (uint8_t)value;
-        value >>= 8;
-    }
-#endif
 }
 
 static ksbonjson_encodeStatus encodePrimitiveNumeric(KSBONJSONEncodeContext* const ctx,
@@ -248,16 +236,11 @@ static ksbonjson_encodeStatus encodePrimitiveNumeric(KSBONJSONEncodeContext* con
                                                      const uint64_t valueBits,
                                                      size_t byteCount)
 {
-    // Allocate 2 unions to give scratch space in front of the encoded value
-    union number_bits bits[2];
+    // Allocate 2 unions to give scratch space in front of the value for the type code
+    union num64_bits bits[2];
     // The last byte of our scratch space will hold the type code
     bits[0].b[7] = typeCode;
-
-#if KSBONJSON_IS_LITTLE_ENDIAN
-    bits[1].u64 = valueBits;
-#else
-    encodeIntegerIntoBytes(valueBits, bits[1].b, byteCount);
-#endif
+    bits[1].u64 = toLittleEndian(valueBits);
 
     return addEncodedBytes(ctx, &bits[0].b[7], byteCount + 1);
 }
@@ -267,43 +250,63 @@ static ksbonjson_encodeStatus encodeSmallInt(KSBONJSONEncodeContext* const ctx, 
     return addEncodedByte(ctx, (uint8_t)value);
 }
 
-static size_t positiveIntegerRequiredBytes(uint64_t value)
+static uint64_t minBitsToEncodePositiveValue(uint64_t value)
 {
-    size_t byteCount = 1;
-    for(uint64_t v = value >> 8; v != 0; v >>= 8)
-    {
-        byteCount++;
-    }
-    return byteCount;
+	// OR with 1 because a value of 0 still requires 1 bit to encode
+	value |= 1;
+
+#if HAS_BUILTIN(__builtin_clzll)
+	return (size_t)(64 - __builtin_clzll(value));
+#else
+	// Smear set bits right
+    value |= value >> 1;
+    value |= value >> 2;
+    value |= value >> 4;
+    value |= value >> 8;
+    value |= value >> 16;
+    value |= value >> 32;
+
+    // Invert to set all higher bits and clear all lower bits
+    value = ~value;
+
+	// Clear all but the lowest set bit
+    value &= -value;
+
+    // Cast to float, then collect the exponent bits (which hold log2 of the value)
+    union num32_bits u = { .f32 = (float)value };
+    uint64_t sigBitCount = ((u.u32>>23) - 0x7f) & 0xff;
+
+    // If smearing resulted in all 1 bits, we'd pass 0 into the float and get
+    // 0x81 because of how the exponent is encoded, so turn this result into 64.
+	return ((sigBitCount&0x7f) ^ (sigBitCount>>7)) | ((sigBitCount&0x80)>>1);
+#endif
 }
 
-static size_t negativeIntegerRequiredBytes(int64_t value)
+static size_t minBytesToEncodePositiveValue(uint64_t value)
 {
-    size_t byteCount = 1;
-    for(int64_t v = value >> 8; v != -1; v >>= 8)
-    {
-        byteCount++;
-    }
-    unlikely_if((value << (64 - byteCount * 8)) >= 0)
-    {
-        // Dropping this 0xff byte would clear the sign bit, so keep it
-        byteCount++;
-    }
-    return byteCount;
+    return (minBitsToEncodePositiveValue(value)-1) / 8 + 1;
 }
 
-static size_t exponentRequiredBytes(int64_t value)
+static size_t minBytesToEncodeNegativeValue(int64_t value)
 {
-    if(value > 0)
+#if HAS_BUILTIN(__builtin_clrsbll)
+    return 8 - (unsigned)__builtin_clrsbll(value) / 8;
+#else
+    size_t byteCount = minBytesToEncodePositiveValue((uint64_t)-value);
+    unlikely_if((value << (64 - byteCount*8)) > 0)
     {
-        return positiveIntegerRequiredBytes((uint64_t)value);
+        // If cutting off the upper bytes inverts the sign, we need to encode another byte.
+        byteCount++;
     }
-    if(value < 0)
-    {
-        return negativeIntegerRequiredBytes(value);
-    }
-    // In Big Number exponent encoding, a value of 0 requires 0 bytes to encode
-    return 0;
+
+	return byteCount;
+#endif
+}
+
+static uint64_t absoluteValue64(int64_t value)
+{
+    const int64_t mask = value >> (sizeof(value) * 8 - 1);
+    return (uint64_t)((value + mask) ^ mask);
 }
 
 
@@ -345,8 +348,7 @@ ksbonjson_encodeStatus ksbonjson_terminateDocument(KSBONJSONEncodeContext* const
 ksbonjson_encodeStatus ksbonjson_addBoolean(KSBONJSONEncodeContext* const ctx, const bool value)
 {
     KSBONJSONContainerState* const container = getContainer(ctx);
-    SHOULD_NOT_BE_EXPECTING_OBJECT_NAME(container);
-    SHOULD_NOT_BE_CHUNKING_STRING(container);
+    SHOULD_NOT_BE_EXPECTING_OBJECT_NAME_OR_CHUNKING_STRING(container);
     container->isExpectingName = true;
 
     return addEncodedByte(ctx, value ? TYPE_TRUE : TYPE_FALSE);
@@ -355,8 +357,7 @@ ksbonjson_encodeStatus ksbonjson_addBoolean(KSBONJSONEncodeContext* const ctx, c
 ksbonjson_encodeStatus ksbonjson_addUnsignedInteger(KSBONJSONEncodeContext* const ctx, const uint64_t value)
 {
     KSBONJSONContainerState* const container = getContainer(ctx);
-    SHOULD_NOT_BE_EXPECTING_OBJECT_NAME(container);
-    SHOULD_NOT_BE_CHUNKING_STRING(container);
+    SHOULD_NOT_BE_EXPECTING_OBJECT_NAME_OR_CHUNKING_STRING(container);
     container->isExpectingName = true;
 
     if(value <= SMALLINT_POSITIVE_EDGE)
@@ -364,10 +365,11 @@ ksbonjson_encodeStatus ksbonjson_addUnsignedInteger(KSBONJSONEncodeContext* cons
         return encodeSmallInt(ctx, (int64_t)value);
     }
 
-    const size_t byteCount = positiveIntegerRequiredBytes(value);
+    const size_t byteCount = minBytesToEncodePositiveValue(value);
 
-    // If the top bit isn't set, save as a signed int (prefer signed over unsigned)
-    uint8_t typeCode = ((value >> (byteCount*8-1)) == 0) ? TYPE_SINT8 : TYPE_UINT8;
+    // If the MSB is cleared, save as a signed int (prefer signed over unsigned)
+    uint8_t typeCode = (uint8_t)(TYPE_SINT8 - (value >> (byteCount*8-1)) * 8);
+
     return encodePrimitiveNumeric(ctx, (uint8_t)(typeCode + byteCount - 1), value, byteCount);
 }
 
@@ -379,8 +381,7 @@ ksbonjson_encodeStatus ksbonjson_addSignedInteger(KSBONJSONEncodeContext* const 
     }
 
     KSBONJSONContainerState* const container = getContainer(ctx);
-    SHOULD_NOT_BE_EXPECTING_OBJECT_NAME(container);
-    SHOULD_NOT_BE_CHUNKING_STRING(container);
+    SHOULD_NOT_BE_EXPECTING_OBJECT_NAME_OR_CHUNKING_STRING(container);
     container->isExpectingName = true;
 
     if(value >= SMALLINT_NEGATIVE_EDGE)
@@ -388,7 +389,8 @@ ksbonjson_encodeStatus ksbonjson_addSignedInteger(KSBONJSONEncodeContext* const 
         return encodeSmallInt(ctx, value);
     }
 
-    const size_t byteCount = negativeIntegerRequiredBytes(value);
+    const size_t byteCount = minBytesToEncodeNegativeValue(value);
+
     return encodePrimitiveNumeric(ctx, (uint8_t)(TYPE_SINT8 + byteCount - 1), (uint64_t)value, byteCount);
 }
 
@@ -401,13 +403,13 @@ ksbonjson_encodeStatus ksbonjson_addFloat(KSBONJSONEncodeContext* const ctx, con
     {
         return ksbonjson_addSignedInteger(ctx, asInt);
     }
+#pragma GCC diagnostic pop
 
     KSBONJSONContainerState* const container = getContainer(ctx);
-    SHOULD_NOT_BE_EXPECTING_OBJECT_NAME(container);
-    SHOULD_NOT_BE_CHUNKING_STRING(container);
+    SHOULD_NOT_BE_EXPECTING_OBJECT_NAME_OR_CHUNKING_STRING(container);
 
-    union number_bits bits = {.f64 = value};
-    unlikely_if((bits.u64 & 0x7ff0000000000000ULL) == 0x7ff0000000000000ULL)
+    union num64_bits b64 = {.f64 = value};
+    unlikely_if((b64.u64 & 0x7ff0000000000000ULL) == 0x7ff0000000000000ULL)
     {
         // When all exponent bits are set, it signifies an infinite or NaN value
         return KSBONJSON_ENCODE_INVALID_DATA;
@@ -415,35 +417,39 @@ ksbonjson_encodeStatus ksbonjson_addFloat(KSBONJSONEncodeContext* const ctx, con
 
     container->isExpectingName = true;
 
-    // Check if we fit into a float32
-    bits.f32 = (float)value;
-    if((double)bits.f32 == value)
-    {
-        // Check if we fit into a bfloat16
-        bits.u32 &= ~0xffffu;
-        unlikely_if((double)bits.f32 == value)
-        {
-            bits.u32 >>= 16;
-            return encodePrimitiveNumeric(ctx, TYPE_FLOAT16, bits.u64, 2);
-        }
-        bits.f32 = (float)value;
-        return encodePrimitiveNumeric(ctx, TYPE_FLOAT32, bits.u64, 4);
-    }
-#pragma GCC diagnostic pop
+    // Choose optimal float size
+    const union num32_bits b32 = { .f32 = (float)value };
+    const union num32_bits b16 = { .u32 = b32.u32 & ~0xffffu };
+    union num64_bits compare = { .f64 = (double)b16.f32 };
+    const unsigned isF16 = !(compare.u64 ^ b64.u64);
+    compare.f64 = (double)b32.f32;
+    const unsigned isF32 = !(compare.u64 ^ b64.u64) & !isF16;
+    const unsigned isF64 = !isF32 & !isF16;
 
-    bits.f64 = value;
-    return encodePrimitiveNumeric(ctx, TYPE_FLOAT64, bits.u64, 8);
+    // Calculate arguments
+    const uint8_t typeCode = (uint8_t)(TYPE_FLOAT16 + isF32 + isF64*2);
+    const unsigned byteCount = 2 + 2*isF32 + 6*isF64;
+
+    // Choose which bits to encode
+    const uint64_t mask = (isF16*0xffff) | (isF32*0xffffffff);
+    const uint32_t as16Or32Bit = b32.u32 >> (16*isF16);
+    b64.u64 = (b64.u64&(~mask)) | (as16Or32Bit & mask);
+
+    return encodePrimitiveNumeric(ctx, typeCode, b64.u64, byteCount);
 }
 
 ksbonjson_encodeStatus ksbonjson_addBigNumber(KSBONJSONEncodeContext* const ctx, const KSBigNumber value)
 {
+    KSBONJSONContainerState* const container = getContainer(ctx);
+    SHOULD_NOT_BE_EXPECTING_OBJECT_NAME_OR_CHUNKING_STRING(container);
+
     unlikely_if(value.exponent < -0x800000 || value.exponent > 0x7fffff)
     {
         return KSBONJSON_ENCODE_INVALID_DATA;
     }
 
-    const size_t exponentByteCount = exponentRequiredBytes(value.exponent);
-    const size_t significandByteCount = value.significand == 0 ? 0 : positiveIntegerRequiredBytes(value.significand);
+    const size_t exponentByteCount = value.exponent ? minBytesToEncodePositiveValue(absoluteValue64(value.exponent)) : 0;
+    const size_t significandByteCount = value.significand ? minBytesToEncodePositiveValue(value.significand) : 0;
 
     //   Header Byte
     // ───────────────
@@ -451,24 +457,26 @@ ksbonjson_encodeStatus ksbonjson_addBigNumber(KSBONJSONEncodeContext* const ctx,
     // ╰─┴─┼─┴─╯ ╰─┤ ╰─> Significand sign (0 = positive, 1 = negative)
     //     │       ╰───> Exponent Length (0-3 bytes)
     //     ╰───────────> Significand Length (0-31 bytes, but will never exceed 8)
-    uint8_t bytes[13];
-    bytes[0] = TYPE_BIG_NUMBER;
-    bytes[1] = (uint8_t)(
-                            ((value.significandSign >> 31) & 1) |
-                            (exponentByteCount << 1) |
-                            (significandByteCount << 3)
-                        );
-    encodeIntegerIntoBytes((uint64_t)value.exponent, bytes+2, exponentByteCount);
-    encodeIntegerIntoBytes(value.significand, bytes+2+exponentByteCount, significandByteCount);
 
-    return addEncodedBytes(ctx, bytes, significandByteCount + exponentByteCount + 2);
+    // Allocate 2 unions to give scratch space in front of the significand for the exponent, header, and type code
+    union num64_bits bits[2];
+    bits[1].u64 = toLittleEndian(value.significand);
+    encodeIntegerIntoBytes((uint64_t)value.exponent, bits[0].b+8-exponentByteCount, exponentByteCount);
+    bits[0].b[8-exponentByteCount-1] = (uint8_t)
+        (
+            ((value.significandSign >> 31) & 1) |
+            (exponentByteCount << 1) |
+            (significandByteCount << 3)
+        );
+    bits[0].b[8-exponentByteCount-2] = TYPE_BIG_NUMBER;
+
+    return addEncodedBytes(ctx, bits[0].b+8-exponentByteCount-2, significandByteCount + exponentByteCount + 2);
 }
 
 ksbonjson_encodeStatus ksbonjson_addNull(KSBONJSONEncodeContext* const ctx)
 {
     KSBONJSONContainerState* const container = getContainer(ctx);
-    SHOULD_NOT_BE_EXPECTING_OBJECT_NAME(container);
-    SHOULD_NOT_BE_CHUNKING_STRING(container);
+    SHOULD_NOT_BE_EXPECTING_OBJECT_NAME_OR_CHUNKING_STRING(container);
     container->isExpectingName = true;
 
     return addEncodedByte(ctx, TYPE_NULL);
@@ -479,19 +487,17 @@ ksbonjson_encodeStatus ksbonjson_addString(KSBONJSONEncodeContext* const ctx,
                                            const size_t valueLength)
 {
     KSBONJSONContainerState* const container = getContainer(ctx);
-    SHOULD_NOT_BE_CHUNKING_STRING(container);
-    SHOULD_NOT_BE_NULL(value);
+    SHOULD_NOT_BE_NULL_OR_CHUNKING_STRING(container, value);
+
     // String can be a name or value, so flip expectation
     container->isExpectingName = !container->isExpectingName;
 
     if(valueLength <= 15)
     {
-        PROPAGATE_ERROR(addEncodedByte(ctx, (uint8_t)(TYPE_STRING0 + valueLength)));
-        unlikely_if(valueLength == 0)
-        {
-            return KSBONJSON_ENCODE_OK;
-        }
-        return addEncodedBytes(ctx, (const uint8_t*)value, valueLength);
+        uint8_t buffer[16];
+        buffer[0] = (uint8_t)(TYPE_STRING0 + valueLength);
+        memcpy(buffer+1, (const uint8_t*)value, valueLength);
+        return addEncodedBytes(ctx, buffer, valueLength+1);
     }
 
     PROPAGATE_ERROR(addEncodedByte(ctx, TYPE_STRING));
@@ -521,10 +527,12 @@ ksbonjson_encodeStatus ksbonjson_chunkString(KSBONJSONEncodeContext* const ctx,
         return KSBONJSON_ENCODE_OK;
     }
 
-    // String can be a name or value, so flip expectation
-    container->isExpectingName = !container->isExpectingName;
     // This is the last string chunk, so terminate the string
     container->isChunkingString = false;
+
+    // String can be a name or value, so flip expectation
+    container->isExpectingName = !container->isExpectingName;
+
     return addEncodedByte(ctx, STRING_TERMINATOR);
 }
 
@@ -533,8 +541,7 @@ ksbonjson_encodeStatus ksbonjson_addBONJSONDocument(KSBONJSONEncodeContext* cons
                                                     const size_t documentLength)
 {
     KSBONJSONContainerState* const container = getContainer(ctx);
-    SHOULD_NOT_BE_EXPECTING_OBJECT_NAME(container);
-    SHOULD_NOT_BE_CHUNKING_STRING(container);
+    SHOULD_NOT_BE_EXPECTING_OBJECT_NAME_OR_CHUNKING_STRING(container);
     container->isExpectingName = true;
 
     return addEncodedBytes(ctx, bonjsonDocument, documentLength);
@@ -557,8 +564,7 @@ ksbonjson_encodeStatus ksbonjson_beginArray(KSBONJSONEncodeContext* const ctx)
 ksbonjson_encodeStatus ksbonjson_endContainer(KSBONJSONEncodeContext* const ctx)
 {
     KSBONJSONContainerState* const container = getContainer(ctx);
-    SHOULD_NOT_BE_EXPECTING_OBJECT_VALUE(container);
-    SHOULD_NOT_BE_CHUNKING_STRING(container);
+    SHOULD_NOT_BE_EXPECTING_OBJECT_VALUE_OR_CHUNKING_STRING(container);
 
     unlikely_if(ctx->containerDepth <= 0)
     {

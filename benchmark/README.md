@@ -22,4 +22,9 @@ Building
 Usage
 -----
 
-    Usage: bonjson-benchmark -i some-data.bjn -o result.bjn
+    bonjson-benchmark /path/to/some-data
+
+Where the following files exist, each containing the same data (in their respective formats):
+
+* `/path/to/some-data.json`
+* `/path/to/some-data.bjn`

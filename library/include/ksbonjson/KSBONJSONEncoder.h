@@ -73,7 +73,7 @@ extern "C" {
 
 
 // ============================================================================
-// Common Declarations (synced with decoder)
+// Common Types (synced with decoder)
 // ============================================================================
 
 #ifndef TYPEDEF_KSBIGNUMBER
@@ -105,7 +105,7 @@ extern "C" {
 
 
 // ============================================================================
-// Encoder Declarations
+// Encoder Types
 // ============================================================================
 
 typedef enum
@@ -170,15 +170,14 @@ typedef ksbonjson_encodeStatus (*KSBONJSONAddEncodedDataFunc)(const uint8_t* KSB
                                                               size_t dataLength,
                                                               void* KSBONJSON_RESTRICT userData);
 
+#pragma GCC diagnostic ignored "-Wpadded"
 typedef struct
 {
     uint8_t isObject: 1;
     uint8_t isExpectingName: 1;
     uint8_t isChunkingString: 1;
-    uint8_t unused: 5;
 } KSBONJSONContainerState;
 
-#pragma GCC diagnostic ignored "-Wpadded"
 typedef struct
 {
     KSBONJSONAddEncodedDataFunc addEncodedData;
@@ -340,7 +339,7 @@ KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_endContainer(KSBONJSONEncodeCo
  *
  * @return A statically allocated string describing the status.
  */
-KSBONJSON_PUBLIC const char* ksbonjson_describeEncodeStatus(ksbonjson_encodeStatus status);
+KSBONJSON_PUBLIC const char* ksbonjson_describeEncodeStatus(ksbonjson_encodeStatus status) __attribute__((const));
 
 
 // ============================================================================
@@ -350,5 +349,6 @@ KSBONJSON_PUBLIC const char* ksbonjson_describeEncodeStatus(ksbonjson_encodeStat
 #ifdef __cplusplus
 }
 #endif
+
 
 #endif /* KSBONJSONEncoder_h */

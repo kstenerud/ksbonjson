@@ -73,7 +73,7 @@ extern "C" {
 
 
 // ============================================================================
-// Common Declarations (synced with encoder)
+// Common Types (synced with encoder)
 // ============================================================================
 
 #ifndef TYPEDEF_KSBIGNUMBER
@@ -105,7 +105,7 @@ extern "C" {
 
 
 // ============================================================================
-// Decoder Declarations
+// Decoder Types
 // ============================================================================
 
 typedef enum
@@ -306,7 +306,7 @@ KSBONJSON_PUBLIC ksbonjson_decodeStatus ksbonjson_decode(const uint8_t* KSBONJSO
  *
  * @return A statically allocated string describing the status.
  */
-KSBONJSON_PUBLIC const char* ksbonjson_describeDecodeStatus(ksbonjson_decodeStatus status);
+KSBONJSON_PUBLIC const char* ksbonjson_describeDecodeStatus(ksbonjson_decodeStatus status) __attribute__((const));
 
 
 // ============================================================================

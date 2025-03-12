@@ -3,7 +3,7 @@ Reference Implementation for BONJSON
 
 A C implementation to demonstrate a simple [BONJSON](https://github.com/kstenerud/bonjson/blob/main/bonjson.md) codec.
 
-This library has no external dependencies, makes no allocations, and calls no external functions beyond `memcpy()`.
+This library has no external dependencies, makes no allocations, and calls no external functions beyond `memcpy()` and `memchr()`.
 
 
 Build Requirements
