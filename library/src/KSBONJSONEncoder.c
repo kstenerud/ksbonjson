@@ -188,9 +188,9 @@ static uint64_t toLittleEndian(uint64_t v)
     return v;
 #else
     // Most compilers optimize this to a byte-swap instruction
-	return (v>>56) | ((v&0x00ff000000000000ULL)>>40) | ((v&0x0000ff0000000000ULL)>>24) |
-		   ((v&0x000000ff00000000ULL)>> 8) | ((v&0x00000000ff000000ULL)<< 8) |
-		   (v<<56) | ((v&0x000000000000ff00ULL)<<40) | ((v&0x0000000000ff0000ULL)<<24);
+    return (v>>56) | ((v&0x00ff000000000000ULL)>>40) | ((v&0x0000ff0000000000ULL)>>24) |
+           ((v&0x000000ff00000000ULL)>> 8) | ((v&0x00000000ff000000ULL)<< 8) |
+           (v<<56) | ((v&0x000000000000ff00ULL)<<40) | ((v&0x0000000000ff0000ULL)<<24);
 #endif
 }
 
@@ -252,13 +252,13 @@ static ksbonjson_encodeStatus encodeSmallInt(KSBONJSONEncodeContext* const ctx, 
 
 static uint64_t minBitsToEncodePositiveValue(uint64_t value)
 {
-	// OR with 1 because a value of 0 still requires 1 bit to encode
-	value |= 1;
+    // OR with 1 because a value of 0 still requires 1 bit to encode
+    value |= 1;
 
 #if HAS_BUILTIN(__builtin_clzll)
-	return (size_t)(64 - __builtin_clzll(value));
+    return (size_t)(64 - __builtin_clzll(value));
 #else
-	// Smear set bits right
+    // Smear set bits right
     value |= value >> 1;
     value |= value >> 2;
     value |= value >> 4;
@@ -269,7 +269,7 @@ static uint64_t minBitsToEncodePositiveValue(uint64_t value)
     // Invert to set all higher bits and clear all lower bits
     value = ~value;
 
-	// Clear all but the lowest set bit
+    // Clear all but the lowest set bit
     value &= -value;
 
     // Cast to float, then collect the exponent bits (which hold log2 of the value)
@@ -278,7 +278,7 @@ static uint64_t minBitsToEncodePositiveValue(uint64_t value)
 
     // If smearing resulted in all 1 bits, we'd pass 0 into the float and get
     // 0x81 because of how the exponent is encoded, so turn this result into 64.
-	return ((sigBitCount&0x7f) ^ (sigBitCount>>7)) | ((sigBitCount&0x80)>>1);
+    return ((sigBitCount&0x7f) ^ (sigBitCount>>7)) | ((sigBitCount&0x80)>>1);
 #endif
 }
 
@@ -299,7 +299,7 @@ static size_t minBytesToEncodeNegativeValue(int64_t value)
         byteCount++;
     }
 
-	return byteCount;
+    return byteCount;
 #endif
 }
 
