@@ -170,6 +170,7 @@ typedef ksbonjson_encodeStatus (*KSBONJSONAddEncodedDataFunc)(const uint8_t* KSB
                                                               size_t dataLength,
                                                               void* KSBONJSON_RESTRICT userData);
 
+#pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpadded"
 typedef struct
 {

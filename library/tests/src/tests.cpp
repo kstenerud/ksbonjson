@@ -58,7 +58,7 @@ protected:
         return KSBONJSON_DECODE_OK;
     }
 
-    ksbonjson_decodeStatus onValue(int64_t value)
+    ksbonjson_decodeStatus onValue(int64_t value) override
     {
         addEvent(std::make_shared<IntegerEvent>(value));
         return KSBONJSON_DECODE_OK;
@@ -746,6 +746,21 @@ TEST(EncodeDecode, BigNumber)
     assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 1,  1))}, {TYPE_BIG_NUMBER, 0x0b, 0x01, 0x01});
     assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 1, -1))}, {TYPE_BIG_NUMBER, 0x0a, 0xff, 0x01});
     assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 1, -1))}, {TYPE_BIG_NUMBER, 0x0b, 0xff, 0x01});
+
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 0x40, 0))}, {TYPE_BIG_NUMBER, 0x08, 0x40});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 0x80, 0))}, {TYPE_BIG_NUMBER, 0x08, 0x80});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 0x81, 0))}, {TYPE_BIG_NUMBER, 0x08, 0x81});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 0x90, 0))}, {TYPE_BIG_NUMBER, 0x08, 0x90});
+
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 0x01, 0x40))}, {TYPE_BIG_NUMBER, 0x0a, 0x40, 0x01});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 0x01, 0x80))}, {TYPE_BIG_NUMBER, 0x0c, 0x80, 0x00, 0x01});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 0x01, 0x81))}, {TYPE_BIG_NUMBER, 0x0c, 0x81, 0x00, 0x01});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 0x01, 0x90))}, {TYPE_BIG_NUMBER, 0x0c, 0x90, 0x00, 0x01});
+
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 0x01, -0x40))}, {TYPE_BIG_NUMBER, 0x0a, 0xc0, 0x01});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 0x01, -0x80))}, {TYPE_BIG_NUMBER, 0x0a, 0x80, 0x01});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 0x01, -0x81))}, {TYPE_BIG_NUMBER, 0x0c, 0x7f, 0xff, 0x01});
+    assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 0x01, -0x90))}, {TYPE_BIG_NUMBER, 0x0c, 0x70, 0xff, 0x01});
 
     assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 0x123, 0))}, {TYPE_BIG_NUMBER, 0x10, 0x23, 0x01});
     assert_encode_decode({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 0x123, 0))}, {TYPE_BIG_NUMBER, 0x11, 0x23, 0x01});

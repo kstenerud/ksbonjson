@@ -27,6 +27,7 @@
 #include <ksbonjson/KSBONJSONEncoder.h>
 #include <string.h> // For memcpy()
 
+#pragma GCC diagnostic ignored "-Wdeclaration-after-statement"
 
 // ============================================================================
 // Helpers
@@ -85,6 +86,7 @@
 
 // Compiler hints for "if" statements
 #ifndef likely_if
+#   pragma GCC diagnostic push
 #   pragma GCC diagnostic ignored "-Wunused-macros"
 #   if HAS_BUILTIN(__builtin_expect)
 #       define likely_if(x) if(__builtin_expect(x,1))
@@ -250,13 +252,21 @@ static ksbonjson_encodeStatus encodeSmallInt(KSBONJSONEncodeContext* const ctx, 
     return addEncodedByte(ctx, (uint8_t)value);
 }
 
-static uint64_t minBitsToEncodePositiveValue(uint64_t value)
+#if !HAS_BUILTIN(__builtin_clrsbll)
+static uint64_t absoluteValue64(int64_t value)
 {
-    // OR with 1 because a value of 0 still requires 1 bit to encode
+    const int64_t mask = value >> (sizeof(value) * 8 - 1);
+    return (uint64_t)((value + mask) ^ mask);
+}
+#endif
+
+static size_t leadingZeroBitsMax63(uint64_t value)
+{
+    // Passing 0 is undefined. We can compensate in the caller.
     value |= 1;
 
 #if HAS_BUILTIN(__builtin_clzll)
-    return (size_t)(64 - __builtin_clzll(value));
+    return (size_t)__builtin_clzll(value);
 #else
     // Smear set bits right
     value |= value >> 1;
@@ -278,35 +288,38 @@ static uint64_t minBitsToEncodePositiveValue(uint64_t value)
 
     // If smearing resulted in all 1 bits, we'd pass 0 into the float and get
     // 0x81 because of how the exponent is encoded, so turn this result into 64.
-    return ((sigBitCount&0x7f) ^ (sigBitCount>>7)) | ((sigBitCount&0x80)>>1);
+    sigBitCount = ((sigBitCount&0x7f) ^ (sigBitCount>>7)) | ((sigBitCount&0x80)>>1);
+
+    return 64 - sigBitCount;
 #endif
 }
 
-static size_t minBytesToEncodePositiveValue(uint64_t value)
+static size_t requiredUnsignedIntegerBytesMin1(uint64_t value)
 {
-    return (minBitsToEncodePositiveValue(value)-1) / 8 + 1;
+    return (63 - leadingZeroBitsMax63(value)) / 8 + 1;
 }
 
-static size_t minBytesToEncodeNegativeValue(int64_t value)
+static size_t requiredUnsignedIntegerBytesMin0(uint64_t value)
+{
+    return requiredUnsignedIntegerBytesMin1(value) - !value;
+}
+
+static size_t requiredSignedIntegerBytesMin1(int64_t value)
 {
 #if HAS_BUILTIN(__builtin_clrsbll)
-    return 8 - (unsigned)__builtin_clrsbll(value) / 8;
+    return (63 - (size_t)__builtin_clrsbll(value | 1)) / 8 + 1;
 #else
-    size_t byteCount = minBytesToEncodePositiveValue((uint64_t)-value);
-    unlikely_if((value << (64 - byteCount*8)) > 0)
-    {
-        // If cutting off the upper bytes inverts the sign, we need to encode another byte.
-        byteCount++;
-    }
-
-    return byteCount;
+    size_t leadingZeroBitCount = leadingZeroBitsMax63(absoluteValue64(value));
+    size_t removeByteCount = leadingZeroBitCount / 8;
+    int64_t shifted = value << removeByteCount*8;
+    // If the sign changes when cutting out the extra bytes, we need 1 more byte.
+    return 8 - removeByteCount + (((value^shifted)>>63) & 1);
 #endif
 }
 
-static uint64_t absoluteValue64(int64_t value)
+static size_t requiredSignedIntegerBytesMin0(int64_t value)
 {
-    const int64_t mask = value >> (sizeof(value) * 8 - 1);
-    return (uint64_t)((value + mask) ^ mask);
+    return requiredSignedIntegerBytesMin1(value) - !value;
 }
 
 
@@ -365,7 +378,7 @@ ksbonjson_encodeStatus ksbonjson_addUnsignedInteger(KSBONJSONEncodeContext* cons
         return encodeSmallInt(ctx, (int64_t)value);
     }
 
-    const size_t byteCount = minBytesToEncodePositiveValue(value);
+    const size_t byteCount = requiredUnsignedIntegerBytesMin1(value);
 
     // If the MSB is cleared, save as a signed int (prefer signed over unsigned)
     uint8_t typeCode = (uint8_t)(TYPE_SINT8 - (value >> (byteCount*8-1)) * 8);
@@ -389,7 +402,7 @@ ksbonjson_encodeStatus ksbonjson_addSignedInteger(KSBONJSONEncodeContext* const 
         return encodeSmallInt(ctx, value);
     }
 
-    const size_t byteCount = minBytesToEncodeNegativeValue(value);
+    const size_t byteCount = requiredSignedIntegerBytesMin1(value);
 
     return encodePrimitiveNumeric(ctx, (uint8_t)(TYPE_SINT8 + byteCount - 1), (uint64_t)value, byteCount);
 }
@@ -398,6 +411,7 @@ ksbonjson_encodeStatus ksbonjson_addFloat(KSBONJSONEncodeContext* const ctx, con
 {
     const int64_t asInt = (int64_t)value;
 
+#pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wfloat-equal"
     unlikely_if((double)asInt == value)
     {
@@ -448,8 +462,8 @@ ksbonjson_encodeStatus ksbonjson_addBigNumber(KSBONJSONEncodeContext* const ctx,
         return KSBONJSON_ENCODE_INVALID_DATA;
     }
 
-    const size_t exponentByteCount = value.exponent ? minBytesToEncodePositiveValue(absoluteValue64(value.exponent)) : 0;
-    const size_t significandByteCount = value.significand ? minBytesToEncodePositiveValue(value.significand) : 0;
+    const size_t exponentByteCount = requiredSignedIntegerBytesMin0(value.exponent);
+    const size_t significandByteCount = requiredUnsignedIntegerBytesMin0(value.significand);
 
     //   Header Byte
     // ───────────────
@@ -597,6 +611,7 @@ const char* ksbonjson_describeEncodeStatus(const ksbonjson_encodeStatus status)
             return "The object to encode contains invalid data";
         case KSBONJSON_ENCODE_COULD_NOT_ADD_DATA:
             return "addEncodedBytes() failed to process the passed in data";
+#pragma GCC diagnostic ignored "-Wcovered-switch-default"
         default:
             return "(unknown status - was it a user-defined status code?)";
     }

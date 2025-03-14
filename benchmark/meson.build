@@ -32,12 +32,6 @@ build_args = [
 build_args += [
   '-DPROJECT_NAME=' + meson.project_name(),
   '-DPROJECT_VERSION=' + meson.project_version(),
-  '-Wno-error=suggest-attribute=pure',
-  '-Wno-error=suggest-attribute=const',
-  '-Wno-error=suggest-attribute=noreturn',
-  '-Wno-error=suggest-attribute=format',
-  '-Wno-error=suggest-attribute=cold',
-  '-Wno-error=suggest-attribute=malloc',
 ]
 
 project_target = executable(
