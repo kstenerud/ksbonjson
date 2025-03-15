@@ -26,18 +26,20 @@ Points of Interest
 Last Benchmark Run
 ------------------
 
-Benchmarking vs [jq](https://github.com/jqlang/jq) on [large-file](https://github.com/json-iterator/test-data/blob/master/large-file.json)
+Benchmarking vs [jq](https://github.com/jqlang/jq) using [this test data](https://github.com/kstenerud/test-data):
 
-    ~/ksbonjson/benchmark$ ./benchmark.sh large-file
+```
+~/ksbonjson/benchmark$ ./benchmark.sh 1000mb
 
-    Benchmarking BONJSON decode+encode with 23364k file large-file.bjn
+Benchmarking BONJSON decode+encode with 902208k file 1000mb.bjn
 
-    real    0m0.086s
-    user    0m0.060s
-    sys     0m0.034s
+real    0m1.849s
+user    0m0.889s
+sys     0m1.152s
 
-    Benchmarking JSON decode+encode with 25532k file large-file.json
+Benchmarking JSON decode+encode with 1025564k file 1000mb.json
 
-    real    0m0.747s
-    user    0m0.689s
-    sys     0m0.073s
+real    0m32.455s
+user    0m30.295s
+sys     0m2.693s
+```
