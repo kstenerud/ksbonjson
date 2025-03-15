@@ -1,7 +1,7 @@
 //
-//  KSBONJSONCodec.c
+//  KSBONJSONCommon.h
 //
-//  Created by Karl Stenerud on 2024-07-07.
+//  Created by Karl Stenerud on 2025-03-15.
 //
 //  Copyright (c) 2024 Karl Stenerud. All rights reserved.
 //
