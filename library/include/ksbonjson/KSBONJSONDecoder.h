@@ -94,12 +94,13 @@ extern "C" {
      */
     static inline KSBigNumber ksbonjson_newBigNumber(int sign, uint64_t significandAbs, int32_t exponent)
     {
-        return (KSBigNumber)
+        KSBigNumber v =
                 {
                     .significand = significandAbs,
                     .exponent = exponent,
                     .significandSign = (int32_t)sign,
                 };
+        return v;
     }
 #endif // TYPEDEF_KSBIGNUMBER
 
