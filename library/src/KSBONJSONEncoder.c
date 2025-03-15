@@ -29,6 +29,7 @@
 
 #pragma GCC diagnostic ignored "-Wdeclaration-after-statement"
 
+
 // ============================================================================
 // Helpers
 // ============================================================================
@@ -279,11 +280,11 @@ static size_t leadingZeroBitsMax63(uint64_t value)
     // Invert to set all higher bits and clear all lower bits
     value = ~value;
 
-    // Clear all but the lowest set bit
+    // Clear all but the lowest set bit. We now have only one bit set
     value &= -value;
 
     // Cast to float, then collect the exponent bits (which hold log2 of the value)
-    union num32_bits u = { .f32 = (float)value };
+    const union num32_bits u = { .f32 = (float)value };
     uint64_t sigBitCount = ((u.u32>>23) - 0x7f) & 0xff;
 
     // If smearing resulted in all 1 bits, we'd pass 0 into the float and get
@@ -309,11 +310,12 @@ static size_t requiredSignedIntegerBytesMin1(int64_t value)
 #if HAS_BUILTIN(__builtin_clrsbll)
     return (63 - (size_t)__builtin_clrsbll(value | 1)) / 8 + 1;
 #else
-    size_t leadingZeroBitCount = leadingZeroBitsMax63(absoluteValue64(value));
-    size_t removeByteCount = leadingZeroBitCount / 8;
-    int64_t shifted = value << removeByteCount*8;
+    const size_t leadingZeroBitCount = leadingZeroBitsMax63(absoluteValue64(value));
+    const size_t byteCountToRemove = leadingZeroBitCount / 8;
+    const int64_t highBytesRemoved = value << byteCountToRemove*8;
+    const size_t signDidChange = ((value ^ highBytesRemoved) >> 63) & 1;
     // If the sign changes when cutting out the extra bytes, we need 1 more byte.
-    return 8 - removeByteCount + (((value^shifted)>>63) & 1);
+    return 8 - byteCountToRemove + signDidChange;
 #endif
 }
 
@@ -380,31 +382,35 @@ ksbonjson_encodeStatus ksbonjson_addUnsignedInteger(KSBONJSONEncodeContext* cons
 
     const size_t byteCount = requiredUnsignedIntegerBytesMin1(value);
 
-    // If the MSB is cleared, save as a signed int (prefer signed over unsigned)
-    uint8_t typeCode = (uint8_t)(TYPE_SINT8 - (value >> (byteCount*8-1)) * 8);
+    // Save as signed if MSB is cleared (prefer signed over unsigned)
+    const uint8_t isMSBSet = (uint8_t)(value >> (byteCount * 8 - 1));
+    const uint8_t typeCode = TYPE_SINT8 - isMSBSet * 8;
 
     return encodePrimitiveNumeric(ctx, (uint8_t)(typeCode + byteCount - 1), value, byteCount);
 }
 
 ksbonjson_encodeStatus ksbonjson_addSignedInteger(KSBONJSONEncodeContext* const ctx, const int64_t value)
 {
-    if(value >= 0)
-    {
-        return ksbonjson_addUnsignedInteger(ctx, (uint64_t)value);
-    }
-
     KSBONJSONContainerState* const container = getContainer(ctx);
     SHOULD_NOT_BE_EXPECTING_OBJECT_NAME_OR_CHUNKING_STRING(container);
     container->isExpectingName = true;
 
-    if(value >= SMALLINT_NEGATIVE_EDGE)
+    if(value >= SMALLINT_NEGATIVE_EDGE && value <= SMALLINT_POSITIVE_EDGE)
     {
         return encodeSmallInt(ctx, value);
     }
 
-    const size_t byteCount = requiredSignedIntegerBytesMin1(value);
+    size_t byteCount = requiredSignedIntegerBytesMin1(value);
 
-    return encodePrimitiveNumeric(ctx, (uint8_t)(TYPE_SINT8 + byteCount - 1), (uint64_t)value, byteCount);
+    // If it's positive and fits in less bytes as unsigned, save as type unsigned.
+    const uint64_t maskOutIfNegative = (uint64_t)~(value>>63);
+    const uint64_t highByteIs0 = !(value>>(8*(byteCount-1)));
+    const uint64_t isPositiveAndHighByteIs0 = maskOutIfNegative & highByteIs0;
+
+    byteCount -= isPositiveAndHighByteIs0;
+    const uint8_t typeCode = (uint8_t)(TYPE_SINT8 + byteCount - 1 - 8*isPositiveAndHighByteIs0);
+
+    return encodePrimitiveNumeric(ctx, typeCode, (uint64_t)value, byteCount);
 }
 
 ksbonjson_encodeStatus ksbonjson_addFloat(KSBONJSONEncodeContext* const ctx, const double value)

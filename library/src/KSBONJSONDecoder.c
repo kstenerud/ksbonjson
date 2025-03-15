@@ -27,6 +27,8 @@
 #include <ksbonjson/KSBONJSONDecoder.h>
 #include <string.h> // For memcpy() and memchr()
 
+#pragma GCC diagnostic ignored "-Wdeclaration-after-statement"
+
 
 // ============================================================================
 // Helpers
@@ -85,6 +87,7 @@
 
 // Compiler hints for "if" statements
 #ifndef likely_if
+#   pragma GCC diagnostic push
 #   pragma GCC diagnostic ignored "-Wunused-macros"
 #   if HAS_BUILTIN(__builtin_expect)
 #       define likely_if(x) if(__builtin_expect(x,1))
@@ -143,6 +146,7 @@ union number_bits
     double   f64;
 };
 
+#pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpadded"
 typedef struct
 {
@@ -283,13 +287,13 @@ static ksbonjson_decodeStatus decodeAndReportSignedInteger(DecodeContext* const 
 static ksbonjson_decodeStatus decodeAndReportFloat16(DecodeContext* const ctx)
 {
     SHOULD_HAVE_ROOM_FOR_BYTES(2);
-    return reportFloat(ctx, decodeFloat16(ctx));
+    return reportFloat(ctx, (double)decodeFloat16(ctx));
 }
 
 static ksbonjson_decodeStatus decodeAndReportFloat32(DecodeContext* const ctx)
 {
     SHOULD_HAVE_ROOM_FOR_BYTES(4);
-    return reportFloat(ctx, decodeFloat32(ctx));
+    return reportFloat(ctx, (double)decodeFloat32(ctx));
 }
 
 static ksbonjson_decodeStatus decodeAndReportFloat64(DecodeContext* const ctx)
@@ -547,7 +551,8 @@ const char* ksbonjson_describeDecodeStatus(const ksbonjson_decodeStatus status)
             return "A callback failed to process the passed in data";
         case KSBONJSON_DECODE_INVALID_DATA:
             return "Encountered invalid data";
-        default:
+#pragma GCC diagnostic ignored "-Wcovered-switch-default"
+            default:
             return "(unknown status - was it a user-defined status code?)";
     }
 }
