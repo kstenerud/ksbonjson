@@ -378,19 +378,16 @@ static ksbonjson_decodeStatus decodeValue(DecodeContext* const ctx, const uint8_
 
 static ksbonjson_decodeStatus decodeDocument(DecodeContext* const ctx)
 {
+    static ksbonjson_decodeStatus (*decodeFuncs[2])(DecodeContext*, const uint8_t) =
+    {
+        decodeValue, decodeObjectName,
+    };
+
     while(ctx->bufferCurrent < ctx->bufferEnd)
     {
         ContainerState* const container = &ctx->containers[ctx->containerDepth];
         const uint8_t typeCode = *ctx->bufferCurrent++;
-
-        if((container->isObject & container->isExpectingName))
-        {
-            PROPAGATE_ERROR(ctx, decodeObjectName(ctx, typeCode));
-        }
-        else
-        {
-            PROPAGATE_ERROR(ctx, decodeValue(ctx, typeCode));
-        }
+        PROPAGATE_ERROR(ctx, decodeFuncs[container->isObject & container->isExpectingName](ctx, typeCode));
         container->isExpectingName = !container->isExpectingName;
     }
 
