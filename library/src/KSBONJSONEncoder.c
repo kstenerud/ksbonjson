@@ -138,7 +138,7 @@ static ksbonjson_encodeStatus encodePrimitiveNumeric(KSBONJSONEncodeContext* con
                                                      const uint64_t valueBits,
                                                      size_t byteCount)
 {
-    // Allocate 2 unions to give scratch space in front of the value for the type code
+    // Allocate 2 unions to give scratch space in front of the memory-aligned value for the type code
     union num64_bits bits[2];
     // The last byte of our scratch space will hold the type code
     bits[0].b[7] = typeCode;
@@ -383,7 +383,8 @@ ksbonjson_encodeStatus ksbonjson_addBigNumber(KSBONJSONEncodeContext* const ctx,
     //     │       ╰───> Exponent Length (0-3 bytes)
     //     ╰───────────> Significand Length (0-31 bytes, but will never exceed 8)
 
-    // Allocate 2 unions to give scratch space in front of the significand for the exponent, header, and type code
+    // Allocate 2 unions to give scratch space in front of the memory-aligned significand
+    // for the exponent, header, and type code
     union num64_bits bits[2];
     bits[1].u64 = toLittleEndian(value.significand);
     encodeIntegerIntoBytes((uint64_t)value.exponent, bits[0].b+8-exponentByteCount, exponentByteCount);
