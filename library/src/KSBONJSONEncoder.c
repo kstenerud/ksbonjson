@@ -289,7 +289,7 @@ ksbonjson_encodeStatus ksbonjson_addUnsignedInteger(KSBONJSONEncodeContext* cons
 
     // Save as signed if MSB is cleared (prefer signed over unsigned)
     const uint8_t isMSBSet = (uint8_t)(value >> (byteCount * 8 - 1));
-    const uint8_t typeCode = TYPE_SINT8 - isMSBSet * 8;
+    const uint8_t typeCode = (uint8_t)(TYPE_SINT8 - isMSBSet * 8);
 
     return encodePrimitiveNumeric(ctx, (uint8_t)(typeCode + byteCount - 1), value, byteCount);
 }
