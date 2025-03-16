@@ -447,6 +447,7 @@ const char* ksbonjson_describeDecodeStatus(const ksbonjson_decodeStatus status)
             return "A callback failed to process the passed in data";
         case KSBONJSON_DECODE_INVALID_DATA:
             return "Encountered invalid data";
+        default:
+            return "(unknown status - was it a user-defined status code?)";
     }
-    return "(unknown status - was it a user-defined status code?)";
 }
