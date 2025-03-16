@@ -523,8 +523,6 @@ const char* ksbonjson_describeEncodeStatus(const ksbonjson_encodeStatus status)
             return "The object to encode contains invalid data";
         case KSBONJSON_ENCODE_COULD_NOT_ADD_DATA:
             return "addEncodedBytes() failed to process the passed in data";
-#pragma GCC diagnostic ignored "-Wcovered-switch-default"
-        default:
-            return "(unknown status - was it a user-defined status code?)";
     }
+    return "(unknown status - was it a user-defined status code?)";
 }
