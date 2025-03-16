@@ -300,7 +300,7 @@ ksbonjson_encodeStatus ksbonjson_addSignedInteger(KSBONJSONEncodeContext* const 
     SHOULD_NOT_BE_EXPECTING_OBJECT_NAME_OR_CHUNKING_STRING(container);
     container->isExpectingName = true;
 
-    if(value >= SMALLINT_NEGATIVE_EDGE && value <= SMALLINT_POSITIVE_EDGE)
+    if( (uint64_t)(value-SMALLINT_NEGATIVE_EDGE) <= (SMALLINT_POSITIVE_EDGE-SMALLINT_NEGATIVE_EDGE) )
     {
         return encodeSmallInt(ctx, value);
     }
