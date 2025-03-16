@@ -299,6 +299,11 @@ static ksbonjson_decodeStatus endContainer(DecodeContext* const ctx)
     {
         return KSBONJSON_DECODE_UNBALANCED_CONTAINERS;
     }
+    ContainerState* const container = &ctx->containers[ctx->containerDepth];
+    unlikely_if((container->isObject & !container->isExpectingName))
+    {
+        return KSBONJSON_DECODE_EXPECTED_OBJECT_VALUE;
+    }
 
     ctx->containerDepth--;
     return ctx->callbacks->onEndContainer(ctx->userData);
@@ -352,14 +357,7 @@ static ksbonjson_decodeStatus decodeValue(DecodeContext* const ctx, const uint8_
         case TYPE_OBJECT:
             return beginObject(ctx);
         case TYPE_END:
-        {
-            ContainerState* const container = &ctx->containers[ctx->containerDepth];
-            unlikely_if((container->isObject & !container->isExpectingName))
-            {
-                return KSBONJSON_DECODE_EXPECTED_OBJECT_VALUE;
-            }
             return endContainer(ctx);
-        }
         case TYPE_FALSE:
             return ctx->callbacks->onBoolean(false, ctx->userData);
         case TYPE_TRUE:
