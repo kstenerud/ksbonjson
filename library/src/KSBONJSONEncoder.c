@@ -160,9 +160,14 @@ static uint64_t absoluteValue64(int64_t value)
 }
 #endif
 
+/**
+ * Count the number of leading zero bits.
+ * This will only count up to 63 zero bits because passing 0 to
+ * the builtin it calls is UB. You can compensate by adding
+ * (!value) to the result if you need max 64.
+ */
 static size_t leadingZeroBitsMax63(uint64_t value)
 {
-    // Passing 0 is undefined. We can compensate in the caller.
     value |= 1;
 
 #if HAS_BUILTIN(__builtin_clzll)
@@ -176,10 +181,11 @@ static size_t leadingZeroBitsMax63(uint64_t value)
     value |= value >> 16;
     value |= value >> 32;
 
-    // Invert to set all higher bits and clear all lower bits
+    // Once we invert, all upper bits are set and all lower bits are clear
     value = ~value;
 
-    // Clear all but the lowest set bit. We now have only one bit set
+    // Clear all but the lowest set bit. We now have only one bit set,
+    // and log2 of the value is this bit's position.
     value &= -value;
 
     // Cast to float, then collect the exponent bits (which hold log2 of the value)
