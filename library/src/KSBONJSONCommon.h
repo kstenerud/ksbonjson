@@ -128,7 +128,6 @@ enum
 
 enum
 {
-    STRING_TERMINATOR = 0xff,
     SMALLINT_NEGATIVE_EDGE = -100,
     SMALLINT_POSITIVE_EDGE = 100,
 };

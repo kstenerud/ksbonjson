@@ -152,6 +152,11 @@ typedef enum
     KSBONJSON_ENCODE_INVALID_DATA = 7,
 
     /**
+     * Passed in data was too big or long.
+     */
+    KSBONJSON_ENCODE_TOO_BIG = 8,
+
+    /**
      * Generic error code that can be returned from addEncodedData().
      *
      * More specific error codes (> 100) may also be defined by the user if needed.
@@ -276,8 +281,10 @@ KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addNull(KSBONJSONEncodeContext
 /**
  * Add a string element.
  *
+ * Note: This library doesn't do UTF-8 checking!
+ *
  * @param context The encoding context.
- * @param value The element's value.
+ * @param value The element's value. This MUST be a complete and valid UTF-8 string!
  * @param valueLength the length of the string.
  * @return KSBONJSON_ENCODER_OK if the process was successful.
  */
@@ -288,8 +295,10 @@ KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addString(KSBONJSONEncodeConte
 /**
  * Build a string element progressively in chunks. When isLastChunk is true, the string is considered complete.
  *
+ * Note: This library doesn't do UTF-8 checking!
+ *
  * @param context The encoding context.
- * @param chunk The string chunk.
+ * @param chunk The string chunk. This MUST be a complete and valid UTF-8 string!
  * @param chunkLength the length of the string chunk.
  * @param isLastChunk set to true if this chunk also marks the end of the string element.
  * @return KSBONJSON_ENCODER_OK if the process was successful.

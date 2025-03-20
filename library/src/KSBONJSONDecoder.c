@@ -26,7 +26,7 @@
 
 #include <ksbonjson/KSBONJSONDecoder.h>
 #include "KSBONJSONCommon.h"
-#include <string.h> // For memcpy() and memchr()
+#include <string.h> // For memcpy()
 
 #pragma GCC diagnostic ignored "-Wdeclaration-after-statement"
 
@@ -101,6 +101,52 @@ static uint64_t fromLittleEndian(uint64_t v)
            ((v&0x000000ff00000000ULL)>> 8) | ((v&0x00000000ff000000ULL)<< 8) |
            (v<<56) | ((v&0x000000000000ff00ULL)<<40) | ((v&0x0000000000ff0000ULL)<<24);
 #endif
+}
+
+/**
+ * Get a length field's total byte count from its header.
+ * Note: Undefined for header value 0x00.
+ */
+static size_t decodeLengthFieldTotalByteCount(uint8_t header)
+{
+#if HAS_BUILTIN(__builtin_ctz)
+    return (size_t)__builtin_ctz(header) + 1;
+#else
+    // Isolate lowest 1-bit
+    header &= -header;
+
+    // Calculate log2
+    uint8_t result = (header & 0xAA) != 0;
+    result |= ((header & 0xCC) != 0) << 1;
+    result |= ((header & 0xF0) != 0) << 2;
+
+    // Add 1
+    return result + 1;
+#endif
+}
+
+static ksbonjson_decodeStatus decodeLengthPayload(DecodeContext* const ctx, uint64_t *payloadBuffer)
+{
+    SHOULD_HAVE_ROOM_FOR_BYTES(1);
+    const uint8_t header = *ctx->bufferCurrent;
+    unlikely_if(header == 0)
+    {
+        ctx->bufferCurrent++;
+        SHOULD_HAVE_ROOM_FOR_BYTES(8);
+        union number_bits bits;
+        memcpy(bits.b, ctx->bufferCurrent, 8);
+        ctx->bufferCurrent += 8;
+        *payloadBuffer = fromLittleEndian(bits.u64);
+        return KSBONJSON_DECODE_OK;
+    }
+
+    const size_t count = decodeLengthFieldTotalByteCount(header);
+    SHOULD_HAVE_ROOM_FOR_BYTES(count);
+    union number_bits bits = {0};
+    memcpy(bits.b, ctx->bufferCurrent, count);
+    ctx->bufferCurrent += count;
+    *payloadBuffer = fromLittleEndian(bits.u64 >> count);
+    return KSBONJSON_DECODE_OK;
 }
 
 /**
@@ -249,18 +295,42 @@ static ksbonjson_decodeStatus decodeAndReportShortString(DecodeContext* const ct
 
 static ksbonjson_decodeStatus decodeAndReportLongString(DecodeContext* const ctx)
 {
-    const uint8_t* const begin = ctx->bufferCurrent;
     const uint8_t* const end = ctx->bufferEnd;
 
-    const uint8_t* found = (const uint8_t*)memchr(begin, STRING_TERMINATOR, (size_t)(end-begin));
-    unlikely_if(found == 0)
+    uint64_t lengthPayload;
+    PROPAGATE_ERROR(ctx, decodeLengthPayload(ctx, &lengthPayload));
+    uint64_t length = lengthPayload >> 1;
+    bool moreChunksFollow = (bool)(lengthPayload&1);
+
+    const uint8_t* pos = ctx->bufferCurrent;
+    unlikely_if(pos + length > end)
     {
         return KSBONJSON_DECODE_INCOMPLETE;
     }
+    ctx->bufferCurrent += length;
 
-    const size_t length = (size_t)(found - ctx->bufferCurrent);
-    ctx->bufferCurrent += length + 1;
-    return ctx->callbacks->onString((const char*)begin, length, ctx->userData);
+    likely_if(!moreChunksFollow)
+    {
+        return ctx->callbacks->onString((const char*)pos, length, ctx->userData);
+    }
+
+    PROPAGATE_ERROR(ctx, ctx->callbacks->onStringChunk((const char*)pos, length, moreChunksFollow, ctx->userData));
+
+    while(moreChunksFollow)
+    {
+        PROPAGATE_ERROR(ctx, decodeLengthPayload(ctx, &lengthPayload));
+        length = lengthPayload >> 1;
+        moreChunksFollow = (bool)(lengthPayload&1);
+        pos = ctx->bufferCurrent;
+        unlikely_if(pos + length > end)
+        {
+            return KSBONJSON_DECODE_INCOMPLETE;
+        }
+        ctx->bufferCurrent += length;
+        PROPAGATE_ERROR(ctx, ctx->callbacks->onStringChunk((const char*)pos, length, moreChunksFollow, ctx->userData));
+    }
+
+    return KSBONJSON_DECODE_OK;
 }
 
 static ksbonjson_decodeStatus beginArray(DecodeContext* const ctx)

@@ -96,6 +96,88 @@ static uint64_t toLittleEndian(uint64_t v)
 #endif
 }
 
+#if !HAS_BUILTIN(__builtin_clrsbll)
+static uint64_t absoluteValue64(int64_t value)
+{
+    const int64_t mask = value >> (sizeof(value) * 8 - 1);
+    return (uint64_t)((value + mask) ^ mask);
+}
+#endif
+
+/**
+ * Count the number of leading zero bits.
+ * This will only count up to 63 zero bits because passing 0 to
+ * the builtin it calls is UB. You can compensate by adding
+ * (!value) to the result if you need max 64.
+ */
+static size_t leadingZeroBitsMax63(uint64_t value)
+{
+    value |= 1;
+
+#if HAS_BUILTIN(__builtin_clzll)
+    return (size_t)__builtin_clzll(value);
+#else
+    // Smear set bits right
+    value |= value >> 1;
+    value |= value >> 2;
+    value |= value >> 4;
+    value |= value >> 8;
+    value |= value >> 16;
+    value |= value >> 32;
+
+    // Once we invert, all upper bits are set and all lower bits are clear
+    value = ~value;
+
+    // Clear all but the lowest set bit. We now have only one bit set,
+    // and log2 of the value is this bit's position.
+    value &= -value;
+
+    // Cast to float, then collect the exponent bits (which hold log2 of the value)
+    const union num32_bits u = { .f32 = (float)value };
+    uint64_t sigBitCount = ((u.u32>>23) - 0x7f) & 0xff;
+
+    // If smearing resulted in all 1 bits, we'd pass 0 into the float and get
+    // 0x81 because of how the exponent is encoded, so turn this result into 64.
+    sigBitCount = ((sigBitCount&0x7f) ^ (sigBitCount>>7)) | ((sigBitCount&0x80)>>1);
+
+    return 64 - sigBitCount;
+#endif
+}
+
+static size_t requiredUnsignedIntegerBytesMin1(uint64_t value)
+{
+    return (63 - leadingZeroBitsMax63(value)) / 8 + 1;
+}
+
+static size_t calcLengthExtraByteCountNeeded(uint64_t length)
+{
+    return (63 - leadingZeroBitsMax63(length)) / 7;
+}
+
+static size_t requiredUnsignedIntegerBytesMin0(uint64_t value)
+{
+    return requiredUnsignedIntegerBytesMin1(value) - !value;
+}
+
+static size_t requiredSignedIntegerBytesMin1(int64_t value)
+{
+#if HAS_BUILTIN(__builtin_clrsbll)
+    return (63 - (size_t)__builtin_clrsbll(value | 1)) / 8 + 1;
+#else
+    const size_t leadingZeroBitCount = leadingZeroBitsMax63(absoluteValue64(value));
+    const size_t byteCountToRemove = leadingZeroBitCount / 8;
+    const int64_t highBytesRemoved = value << byteCountToRemove*8;
+    const size_t signDidChange = ((value ^ highBytesRemoved) >> 63) & 1;
+    // If the sign changes when cutting out the extra bytes, we need 1 more byte.
+    return 8 - byteCountToRemove + signDidChange;
+#endif
+}
+
+static size_t requiredSignedIntegerBytesMin0(int64_t value)
+{
+    return requiredSignedIntegerBytesMin1(value) - !value;
+}
+
 static KSBONJSONContainerState* getContainer(KSBONJSONEncodeContext* const ctx)
 {
     return &ctx->containers[ctx->containerDepth];
@@ -152,81 +234,59 @@ static ksbonjson_encodeStatus encodeSmallInt(KSBONJSONEncodeContext* const ctx, 
     return addEncodedByte(ctx, (uint8_t)value);
 }
 
-#if !HAS_BUILTIN(__builtin_clrsbll)
-static uint64_t absoluteValue64(int64_t value)
+static size_t encodeLengthField(uint64_t length,
+                                  uint8_t anotherChunkFollows,
+                                  union num64_bits bits[2])
 {
-    const int64_t mask = value >> (sizeof(value) * 8 - 1);
-    return (uint64_t)((value + mask) ^ mask);
-}
-#endif
+    uint64_t payload = (length << 1) | anotherChunkFollows;
 
-/**
- * Count the number of leading zero bits.
- * This will only count up to 63 zero bits because passing 0 to
- * the builtin it calls is UB. You can compensate by adding
- * (!value) to the result if you need max 64.
- */
-static size_t leadingZeroBitsMax63(uint64_t value)
-{
-    value |= 1;
+    unlikely_if(payload > 0x008fffffffffffff)
+    {
+        bits[0].b[0] = 7;
+        bits[0].b[7] = 0;
+        bits[1].u64 = toLittleEndian(payload);
+        return 9;
+    }
 
-#if HAS_BUILTIN(__builtin_clzll)
-    return (size_t)__builtin_clzll(value);
-#else
-    // Smear set bits right
-    value |= value >> 1;
-    value |= value >> 2;
-    value |= value >> 4;
-    value |= value >> 8;
-    value |= value >> 16;
-    value |= value >> 32;
+    const size_t extraByteCount = calcLengthExtraByteCountNeeded(payload);
+    payload <<= 1;
+    payload |= 1;
+    payload <<= extraByteCount;
 
-    // Once we invert, all upper bits are set and all lower bits are clear
-    value = ~value;
-
-    // Clear all but the lowest set bit. We now have only one bit set,
-    // and log2 of the value is this bit's position.
-    value &= -value;
-
-    // Cast to float, then collect the exponent bits (which hold log2 of the value)
-    const union num32_bits u = { .f32 = (float)value };
-    uint64_t sigBitCount = ((u.u32>>23) - 0x7f) & 0xff;
-
-    // If smearing resulted in all 1 bits, we'd pass 0 into the float and get
-    // 0x81 because of how the exponent is encoded, so turn this result into 64.
-    sigBitCount = ((sigBitCount&0x7f) ^ (sigBitCount>>7)) | ((sigBitCount&0x80)>>1);
-
-    return 64 - sigBitCount;
-#endif
+    bits[0].b[0] = 8;
+    bits[1].u64 = toLittleEndian(payload);
+    return extraByteCount + 1;
 }
 
-static size_t requiredUnsignedIntegerBytesMin1(uint64_t value)
+static ksbonjson_encodeStatus encodeLength(KSBONJSONEncodeContext* const ctx,
+                                           uint64_t length,
+                                           uint8_t anotherChunkFollows)
 {
-    return (63 - leadingZeroBitsMax63(value)) / 8 + 1;
+    unlikely_if(length > 0x7fffffffffffffff)
+    {
+        return KSBONJSON_ENCODE_TOO_BIG;
+    }
+
+    union num64_bits bits[2];
+    size_t byteCount = encodeLengthField(length, anotherChunkFollows, bits);
+    return addEncodedBytes(ctx, bits[0].b + bits[0].b[0], byteCount);
 }
 
-static size_t requiredUnsignedIntegerBytesMin0(uint64_t value)
+static ksbonjson_encodeStatus encodeTypeAndLength(KSBONJSONEncodeContext* const ctx,
+                                                         uint8_t typeCode,
+                                                         uint64_t length,
+                                                         uint8_t anotherChunkFollows)
 {
-    return requiredUnsignedIntegerBytesMin1(value) - !value;
-}
+    unlikely_if(length > 0x7fffffffffffffff)
+    {
+        return KSBONJSON_ENCODE_TOO_BIG;
+    }
 
-static size_t requiredSignedIntegerBytesMin1(int64_t value)
-{
-#if HAS_BUILTIN(__builtin_clrsbll)
-    return (63 - (size_t)__builtin_clrsbll(value | 1)) / 8 + 1;
-#else
-    const size_t leadingZeroBitCount = leadingZeroBitsMax63(absoluteValue64(value));
-    const size_t byteCountToRemove = leadingZeroBitCount / 8;
-    const int64_t highBytesRemoved = value << byteCountToRemove*8;
-    const size_t signDidChange = ((value ^ highBytesRemoved) >> 63) & 1;
-    // If the sign changes when cutting out the extra bytes, we need 1 more byte.
-    return 8 - byteCountToRemove + signDidChange;
-#endif
-}
-
-static size_t requiredSignedIntegerBytesMin0(int64_t value)
-{
-    return requiredSignedIntegerBytesMin1(value) - !value;
+    union num64_bits bits[2];
+    size_t byteCount = encodeLengthField(length, anotherChunkFollows, bits) + 1;
+    uint8_t* ptr = bits[0].b + bits[0].b[0] - 1;
+    *ptr = typeCode;
+    return addEncodedBytes(ctx, ptr, byteCount);
 }
 
 
@@ -426,9 +486,8 @@ ksbonjson_encodeStatus ksbonjson_addString(KSBONJSONEncodeContext* const ctx,
         return addEncodedBytes(ctx, buffer, valueLength+1);
     }
 
-    PROPAGATE_ERROR(addEncodedByte(ctx, TYPE_STRING));
-    PROPAGATE_ERROR(addEncodedBytes(ctx, (const uint8_t*)value, valueLength));
-    return addEncodedByte(ctx, STRING_TERMINATOR);
+    PROPAGATE_ERROR(encodeTypeAndLength(ctx, TYPE_STRING, valueLength, 0));
+    return addEncodedBytes(ctx, (const uint8_t*)value, valueLength);
 }
 
 ksbonjson_encodeStatus ksbonjson_chunkString(KSBONJSONEncodeContext* const ctx,
@@ -439,27 +498,24 @@ ksbonjson_encodeStatus ksbonjson_chunkString(KSBONJSONEncodeContext* const ctx,
     KSBONJSONContainerState* const container = getContainer(ctx);
     SHOULD_NOT_BE_NULL(chunk);
 
-    unlikely_if(!container->isChunkingString)
+    likely_if(container->isChunkingString)
     {
-        // We weren't already chunking, so start a new chunked string
-        PROPAGATE_ERROR(addEncodedByte(ctx, TYPE_STRING));
+        PROPAGATE_ERROR(encodeLength(ctx, chunkLength, !isLastChunk));
+    }
+    else
+    {
+        PROPAGATE_ERROR(encodeTypeAndLength(ctx, TYPE_STRING, chunkLength, !isLastChunk));
     }
 
-    PROPAGATE_ERROR(addEncodedBytes(ctx, (const uint8_t*)chunk, chunkLength));
+    container->isChunkingString = !isLastChunk;
 
-    likely_if(!isLastChunk)
+    unlikely_if(isLastChunk)
     {
-        container->isChunkingString = true;
-        return KSBONJSON_ENCODE_OK;
+        // String can be a name or value, so flip expectation
+        container->isExpectingName = !container->isExpectingName;
     }
 
-    // This is the last string chunk, so terminate the string
-    container->isChunkingString = false;
-
-    // String can be a name or value, so flip expectation
-    container->isExpectingName = !container->isExpectingName;
-
-    return addEncodedByte(ctx, STRING_TERMINATOR);
+    return addEncodedBytes(ctx, (const uint8_t*)chunk, chunkLength);
 }
 
 ksbonjson_encodeStatus ksbonjson_addBONJSONDocument(KSBONJSONEncodeContext* const ctx,
@@ -521,6 +577,8 @@ const char* ksbonjson_describeEncodeStatus(const ksbonjson_encodeStatus status)
             return "Attempted to end the encoding while there are still containers open";
         case KSBONJSON_ENCODE_INVALID_DATA:
             return "The object to encode contains invalid data";
+        case KSBONJSON_ENCODE_TOO_BIG:
+            return "Passed in data was too big or long";
         case KSBONJSON_ENCODE_COULD_NOT_ADD_DATA:
             return "addEncodedBytes() failed to process the passed in data";
         default:

@@ -125,7 +125,7 @@ static void closeFile(FILE* const file)
 
 static uint8_t* readEntireFile(FILE* const file, size_t* const fileLength)
 {
-    size_t bufferSize = 10240;
+    size_t bufferSize = 1024*1024*16;
     uint8_t* buffer = malloc(bufferSize);
     size_t bufferOffset = 0;
     for(;;)
@@ -376,9 +376,38 @@ typedef struct
 {
     KSBONJSONDecodeCallbacks callbacks;
     char* nextName;
+    char* chunkingString;
+    size_t chunkingStringLength;
     DecoderFrame stack[KSBONJSON_MAX_CONTAINER_DEPTH];
     int stackIndex;
 } DecoderContext;
+
+static bool addToChunkingString(DecoderContext* ctx, const char* str, size_t length)
+{
+    size_t oldLength = ctx->chunkingStringLength;
+    size_t newLength = oldLength + length;
+
+    char* newString = realloc(ctx->chunkingString, newLength + 1);
+    if(newString == NULL)
+    {
+        return false;
+    }
+
+    memcpy(newString + oldLength, str, length);
+    newString[newLength] = 0; // Zero terminate
+
+    ctx->chunkingString = newString;
+    ctx->chunkingStringLength = newLength;
+
+    return true;
+}
+
+static void freeChunkingString(DecoderContext* ctx)
+{
+    free(ctx->chunkingString);
+    ctx->chunkingString = NULL;
+    ctx->chunkingStringLength = 0;
+}
 
 static int addObject(DecoderContext* ctx, json_object* obj)
 {
@@ -447,6 +476,39 @@ static ksbonjson_decodeStatus onString(const char* KSBONJSON_RESTRICT value,
     }
 }
 
+static ksbonjson_decodeStatus onStringChunk(const char* KSBONJSON_RESTRICT value,
+                                            size_t length,
+                                            bool isLastChunk,
+                                            void* KSBONJSON_RESTRICT userData)
+{
+    DecoderContext* const ctx = (DecoderContext*)userData;
+
+    addToChunkingString(ctx, value, length);
+    const char* str = ctx->chunkingString;
+
+    if(!isLastChunk)
+    {
+        return KSBONJSON_DECODE_OK;
+    }
+
+    ksbonjson_decodeStatus result = KSBONJSON_DECODE_OK;
+    DecoderFrame* const frame = &ctx->stack[ctx->stackIndex];
+    if(frame->nextIsName)
+    {
+        replaceString(&ctx->nextName, str, length);
+        frame->nextIsName = false;
+        result = KSBONJSON_DECODE_OK;
+    }
+    else
+    {
+        result = addObject(ctx, json_object_new_string_len(str, length));
+    }
+
+    freeChunkingString(ctx);
+
+    return result;
+}
+
 static ksbonjson_decodeStatus onBeginObject(void* userData)
 {
     DecoderContext* const ctx = (DecoderContext*)userData;
@@ -482,7 +544,8 @@ static ksbonjson_decodeStatus onEndContainer(void* userData)
 
 static ksbonjson_decodeStatus onEndData(void* userData)
 {
-    MARK_UNUSED(userData);
+    DecoderContext* const ctx = (DecoderContext*)userData;
+    freeChunkingString(ctx);
     return KSBONJSON_DECODE_OK;
 }
 
@@ -499,6 +562,7 @@ static void initDecoderContext(DecoderContext* ctx)
     ctx->callbacks.onSignedInteger = onSignedInteger;
     ctx->callbacks.onNull = onNull;
     ctx->callbacks.onString = onString;
+    ctx->callbacks.onStringChunk = onStringChunk;
 }
 
 static void bonjsonToJson(const char* const src_path, const char* const dst_path, bool prettyPrint)
@@ -514,6 +578,7 @@ static void bonjsonToJson(const char* const src_path, const char* const dst_path
     ksbonjson_decodeStatus status = ksbonjson_decode(document, documentSize, &ctx.callbacks, &ctx, &decodedOffset);
     if(status != KSBONJSON_DECODE_OK)
     {
+        freeChunkingString(&ctx);
         printErrorAndExit("Failed to decode BONJSON file %s at offset %d: status %d (%s)",
                         src_path,
                         decodedOffset,

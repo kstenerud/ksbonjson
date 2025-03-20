@@ -231,10 +231,6 @@ typedef struct KSBONJSONDecodeCallbacks
      * Even after validation, the string data could in theory contain NUL
      * characters (which are valid in JSON).
      *
-     * Note: value[length] will always be the closing delimiter (0xff), so
-     *       if the source document is writable, you could overwrite the
-     *       delimiter with 0 to create a zero-copy null-terminated string.
-     *
      * @param value The element's value.
      * @param length The value's length.
      * @param userData Data that was specified when calling ksbonjson_decode().
@@ -243,6 +239,25 @@ typedef struct KSBONJSONDecodeCallbacks
     ksbonjson_decodeStatus (*onString)(const char* KSBONJSON_RESTRICT value,
                                        size_t length,
                                        void* KSBONJSON_RESTRICT userData);
+
+    /**
+     * Called when a string chunk is decoded.
+     *
+     * The string data has NOT been validated against UTF-8!
+     *
+     * Even after validation, the string data could in theory contain NUL
+     * characters (which are valid in JSON).
+     *
+     * @param value The chunk's value.
+     * @param length The chunk's length in bytes.
+     * @param isLastChunk If true, this is the last chunk, and the string is done.
+     * @param userData Data that was specified when calling ksbonjson_decode().
+     * @return KSBONJSON_DECODE_OK if decoding should continue.
+     */
+    ksbonjson_decodeStatus (*onStringChunk)(const char* KSBONJSON_RESTRICT value,
+        size_t length,
+        bool isLastChunk,
+        void* KSBONJSON_RESTRICT userData);
 
     /**
      * Called when a new object is encountered.

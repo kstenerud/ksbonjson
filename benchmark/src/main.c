@@ -125,7 +125,7 @@ static void closeFile(FILE* const file)
 
 static uint8_t* readEntireFile(FILE* const file, size_t* const fileLength)
 {
-    size_t bufferSize = 10240;
+    size_t bufferSize = 1024*1024*16;
     uint8_t* buffer = malloc(bufferSize);
     size_t bufferOffset = 0;
     for(;;)
