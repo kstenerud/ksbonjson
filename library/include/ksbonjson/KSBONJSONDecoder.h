@@ -157,6 +157,16 @@ typedef enum
     KSBONJSON_DECODE_INVALID_DATA = 8,
 
     /**
+     * This name already exists in the current object.
+     */
+    KSBONJSON_DECODE_DUPLICATE_OBJECT_NAME = 9,
+
+    /**
+     * The value is out of range and cannot be stored without data loss.
+     */
+    KSBONJSON_DECODE_VALUE_OUT_OF_RANGE = 10,
+
+    /**
      * Generic error code that can be returned from a callback.
      *
      * More specific error codes (> 100) may also be defined by the user if needed.
@@ -242,6 +252,10 @@ typedef struct KSBONJSONDecodeCallbacks
 
     /**
      * Called when a string chunk is decoded.
+     *
+     * The BONSJON spec requires at least one chunking security policy.
+     * As this library is a low-level building block, it's on the user of this library
+     * to add such a policy.
      *
      * The string data has NOT been validated against UTF-8!
      *

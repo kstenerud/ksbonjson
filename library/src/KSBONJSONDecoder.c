@@ -515,6 +515,10 @@ const char* ksbonjson_describeDecodeStatus(const ksbonjson_decodeStatus status)
             return "A callback failed to process the passed in data";
         case KSBONJSON_DECODE_INVALID_DATA:
             return "Encountered invalid data";
+        case KSBONJSON_DECODE_DUPLICATE_OBJECT_NAME:
+            return "This name already exists in the current object";
+        case KSBONJSON_DECODE_VALUE_OUT_OF_RANGE:
+            return "The value is out of range and cannot be stored without data loss";
         default:
             return "(unknown status - was it a user-defined status code?)";
     }
