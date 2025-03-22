@@ -56,7 +56,6 @@ typedef struct
 
 typedef struct
 {
-    const uint8_t* const bufferStart;
     const uint8_t* bufferCurrent;
     const uint8_t* const bufferEnd;
     const KSBONJSONDecodeCallbacks* const callbacks;
@@ -471,7 +470,6 @@ ksbonjson_decodeStatus ksbonjson_decode(const uint8_t* const document,
 {
     DecodeContext ctx =
         {
-            .bufferStart = document,
             .bufferCurrent = document,
             .bufferEnd = document + documentLength,
             .callbacks = callbacks,
@@ -479,7 +477,7 @@ ksbonjson_decodeStatus ksbonjson_decode(const uint8_t* const document,
         };
 
     const ksbonjson_decodeStatus result = decodeDocument(&ctx);
-    *decodedOffset = (size_t)(ctx.bufferCurrent - ctx.bufferStart);
+    *decodedOffset = (size_t)(ctx.bufferCurrent - document);
     return result;
 }
 
