@@ -281,21 +281,32 @@ static ksbonjson_decodeStatus onEndData(void* userData)
     return KSBONJSON_DECODE_OK;
 }
 
-static void initBonjsonDecodeCallbacks(KSBONJSONDecodeCallbacks* callbacks)
+static ksbonjson_decodeStatus onBooleanDoNothing(bool, void*) {return 0;}
+static ksbonjson_decodeStatus onUnsignedIntegerDoNothing(uint64_t, void*) {return 0;}
+static ksbonjson_decodeStatus onSignedIntegerDoNothing(int64_t, void*) {return 0;}
+static ksbonjson_decodeStatus onFloatDoNothing(double, void*) {return 0;}
+static ksbonjson_decodeStatus onNullDoNothing(void*) {return 0;}
+static ksbonjson_decodeStatus onStringDoNothing(const char* KSBONJSON_RESTRICT, size_t, void* KSBONJSON_RESTRICT) {return 0;}
+static ksbonjson_decodeStatus onBeginObjectDoNothing(void*) {return 0;}
+static ksbonjson_decodeStatus onBeginArrayDoNothing(void*) {return 0;}
+static ksbonjson_decodeStatus onEndContainerDoNothing(void*) {return 0;}
+static ksbonjson_decodeStatus onEndDataDoNothing(void*) {return 0;}
+
+static void initBonjsonDecodeCallbacks(KSBONJSONDecodeCallbacks* callbacks, bool decodeOnly)
 {
-    callbacks->onBeginArray = onBeginArray;
-    callbacks->onBeginObject = onBeginObject;
-    callbacks->onBoolean = onBoolean;
-    callbacks->onEndContainer = onEndContainer;
-    callbacks->onEndData = onEndData;
-    callbacks->onFloat = onFloat;
-    callbacks->onUnsignedInteger = onUnsignedInteger;
-    callbacks->onSignedInteger = onSignedInteger;
-    callbacks->onNull = onNull;
-    callbacks->onString = onString;
+    callbacks->onBeginArray = decodeOnly ?      onBeginArrayDoNothing : onBeginArray;
+    callbacks->onBeginObject = decodeOnly ?     onBeginObjectDoNothing : onBeginObject;
+    callbacks->onBoolean = decodeOnly ?         onBooleanDoNothing : onBoolean;
+    callbacks->onEndContainer = decodeOnly ?    onEndContainerDoNothing : onEndContainer;
+    callbacks->onEndData = decodeOnly ?         onEndDataDoNothing : onEndData;
+    callbacks->onFloat = decodeOnly ?           onFloatDoNothing : onFloat;
+    callbacks->onUnsignedInteger = decodeOnly ? onUnsignedIntegerDoNothing : onUnsignedInteger;
+    callbacks->onSignedInteger = decodeOnly ?   onSignedIntegerDoNothing : onSignedInteger;
+    callbacks->onNull = decodeOnly ?            onNullDoNothing : onNull;
+    callbacks->onString = decodeOnly ?          onStringDoNothing : onString;
 }
 
-static void bonjsonToBonjson(const char* const src_path, const char* const dst_path)
+static void bonjsonToBonjson(const char* const src_path, const char* const dst_path, bool decodeOnly)
 {
     FILE* file = openFileForReading(src_path);
     size_t documentSize = 0;
@@ -307,7 +318,7 @@ static void bonjsonToBonjson(const char* const src_path, const char* const dst_p
     ksbonjson_beginEncode(&ctx->encoderContext, addEncodedDataCallback, ctx);
 
     KSBONJSONDecodeCallbacks callbacks;
-    initBonjsonDecodeCallbacks(&callbacks);
+    initBonjsonDecodeCallbacks(&callbacks, decodeOnly);
 
     ksbonjson_decodeStatus status = ksbonjson_decode(document, documentSize, &callbacks, ctx, &decodedOffset);
     if(status != KSBONJSON_DECODE_OK)
@@ -351,6 +362,7 @@ Where the default behavior is to convert from stdin to stdout.\n\
 Options:\n\
   -h: Print help and exit\n\
   -v: Print version and exit\n\
+  -d: Decode only\n\
   -i <path>: Input file (use - to specify stdin) (default stdin)\n\
   -o <path>: Output file (use - to specify stdout) (default stdout)\n\
 \n\
@@ -373,9 +385,10 @@ int main(const int argc, char** const argv)
     const char* dst_path = "-";
 
     g_argv_0 = argv[0];
+    bool decodeOnly = false;
 
     int ch;
-    while((ch = getopt(argc, argv, "?hvi:o:")) >= 0)
+    while((ch = getopt(argc, argv, "?hvi:o:d")) >= 0)
     {
         switch(ch)
         {
@@ -392,6 +405,9 @@ int main(const int argc, char** const argv)
             case 'o':
                 dst_path = strdup(optarg);
                 break;
+            case 'd':
+                decodeOnly = true;
+                break;
             default:
                 printf("Unknown option: %d %c\n", ch, ch);
                 printUsage();
@@ -399,7 +415,7 @@ int main(const int argc, char** const argv)
         }
     }
 
-    bonjsonToBonjson(src_path, dst_path);
+    bonjsonToBonjson(src_path, dst_path, decodeOnly);
 
     return 0;
 }

@@ -384,7 +384,7 @@ ksbonjson_encodeStatus ksbonjson_addFloat(KSBONJSONEncodeContext* const ctx, con
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wfloat-equal"
-    unlikely_if((double)asInt == value)
+    if((double)asInt == value)
     {
         return ksbonjson_addSignedInteger(ctx, asInt);
     }
@@ -498,7 +498,7 @@ ksbonjson_encodeStatus ksbonjson_chunkString(KSBONJSONEncodeContext* const ctx,
     KSBONJSONContainerState* const container = getContainer(ctx);
     SHOULD_NOT_BE_NULL(chunk);
 
-    likely_if(container->isChunkingString)
+    if(container->isChunkingString)
     {
         PROPAGATE_ERROR(encodeLength(ctx, chunkLength, !isLastChunk));
     }
@@ -509,7 +509,7 @@ ksbonjson_encodeStatus ksbonjson_chunkString(KSBONJSONEncodeContext* const ctx,
 
     container->isChunkingString = !isLastChunk;
 
-    unlikely_if(isLastChunk)
+    if(isLastChunk)
     {
         // String can be a name or value, so flip expectation
         container->isExpectingName = !container->isExpectingName;
