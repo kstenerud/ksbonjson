@@ -295,18 +295,13 @@ static ksbonjson_decodeStatus decodeAndReportShortString(DecodeContext* const ct
 
 static ksbonjson_decodeStatus decodeAndReportLongString(DecodeContext* const ctx)
 {
-    const uint8_t* const end = ctx->bufferEnd;
-
     uint64_t lengthPayload;
     PROPAGATE_ERROR(ctx, decodeLengthPayload(ctx, &lengthPayload));
     uint64_t length = lengthPayload >> 1;
     bool moreChunksFollow = (bool)(lengthPayload&1);
+    SHOULD_HAVE_ROOM_FOR_BYTES(length);
 
     const uint8_t* pos = ctx->bufferCurrent;
-    unlikely_if(pos + length > end)
-    {
-        return KSBONJSON_DECODE_INCOMPLETE;
-    }
     ctx->bufferCurrent += length;
 
     likely_if(!moreChunksFollow)
@@ -321,11 +316,8 @@ static ksbonjson_decodeStatus decodeAndReportLongString(DecodeContext* const ctx
         PROPAGATE_ERROR(ctx, decodeLengthPayload(ctx, &lengthPayload));
         length = lengthPayload >> 1;
         moreChunksFollow = (bool)(lengthPayload&1);
+        SHOULD_HAVE_ROOM_FOR_BYTES(length);
         pos = ctx->bufferCurrent;
-        unlikely_if(pos + length > end)
-        {
-            return KSBONJSON_DECODE_INCOMPLETE;
-        }
         ctx->bufferCurrent += length;
         PROPAGATE_ERROR(ctx, ctx->callbacks->onStringChunk((const char*)pos, length, moreChunksFollow, ctx->userData));
     }
