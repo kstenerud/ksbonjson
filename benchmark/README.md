@@ -27,4 +27,4 @@ Usage
 Where the following files exist, each containing the same data (in their respective formats):
 
 * `/path/to/some-data.json`
-* `/path/to/some-data.bjn`
+* `/path/to/some-data.boj`

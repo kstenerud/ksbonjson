@@ -4,7 +4,7 @@ set -eu
 
 if [ $# -ne 1 ]; then
 	echo "Usage: benchmark.sh <json-and-bonjson-file-basename>"
-        echo "You will need two files containing equivalent data: <file>.json and <file>.bjn"
+        echo "You will need two files containing equivalent data: <file>.json and <file>.boj"
 	exit 1
 fi
 
@@ -35,18 +35,18 @@ benchmark-bonjson-decode() {
         cat "$src_file" | ./build/bonjson-benchmark -d
 }
 
-BONJSON_TMPFILE=$(mktemp /tmp/bonjson-benchmark.XXXXXX.bjn)
+BONJSON_TMPFILE=$(mktemp /tmp/bonjson-benchmark.XXXXXX.boj)
 JSON_TMPFILE=$(mktemp /tmp/json-benchmark.XXXXXX.json)
 
 rm -f "$BONJSON_TMPFILE"
 rm -f "$JSON_TMPFILE"
 
-introduce-benchmark "BONJSON (decode+encode)" "${SRC_FILE}.bjn"
-time benchmark-bonjson "${SRC_FILE}.bjn" "$BONJSON_TMPFILE"
+introduce-benchmark "BONJSON (decode+encode)" "${SRC_FILE}.boj"
+time benchmark-bonjson "${SRC_FILE}.boj" "$BONJSON_TMPFILE"
 # ls -l "$BONJSON_TMPFILE"
 
-introduce-benchmark "BONJSON (decode only)" "${SRC_FILE}.bjn"
-time benchmark-bonjson-decode "${SRC_FILE}.bjn"
+introduce-benchmark "BONJSON (decode only)" "${SRC_FILE}.boj"
+time benchmark-bonjson-decode "${SRC_FILE}.boj"
 
 introduce-benchmark "JSON (decode+encode)" "${SRC_FILE}.json"
 time benchmark-json "${SRC_FILE}.json" "$JSON_TMPFILE"
