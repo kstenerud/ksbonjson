@@ -369,7 +369,7 @@ void assert_encode(std::vector<std::shared_ptr<Event>> events, std::vector<uint8
     ASSERT_EQ(expected_encoded, actual_encoded);
 }
 
-void assert_decode(std::vector<uint8_t> document, std::vector<std::shared_ptr<Event>> expected_events)
+void assert_decode(std::vector<std::shared_ptr<Event>> expected_events, std::vector<uint8_t> document)
 {
     if(REPORT_ENCODING || REPORT_DECODING)
     {
@@ -476,14 +476,14 @@ TEST(EncodeDecode, float32)
 {
     assert_encode_decode({std::make_shared<FloatEvent>(0x1.3f7p5)}, {TYPE_FLOAT32, 0x00, 0xb8, 0x1f, 0x42});
 
-    assert_decode({TYPE_FLOAT32, 0x00, 0x00, 0x90, 0x3f}, {std::make_shared<FloatEvent>(1.125)});
+    assert_decode({std::make_shared<FloatEvent>(1.125)}, {TYPE_FLOAT32, 0x00, 0x00, 0x90, 0x3f});
 }
 
 TEST(EncodeDecode, float64)
 {
     assert_encode_decode({std::make_shared<FloatEvent>(1.234)}, {TYPE_FLOAT64, 0x58, 0x39, 0xb4, 0xc8, 0x76, 0xbe, 0xf3, 0x3f});
 
-    assert_decode({TYPE_FLOAT64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf2, 0x3f}, {std::make_shared<FloatEvent>(1.125)});
+    assert_decode({std::make_shared<FloatEvent>(1.125)}, {TYPE_FLOAT64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf2, 0x3f});
 }
 
 TEST(EncodeDecode, smallint)
@@ -514,9 +514,9 @@ TEST(EncodeDecode, int8)
     assert_encode_decode({std::make_shared<IntegerEvent>(-127)}, {TYPE_SINT8, (uint8_t)(-127)});
     assert_encode_decode({std::make_shared<IntegerEvent>(-128)}, {TYPE_SINT8, (uint8_t)(-128)});
 
-    assert_decode({TYPE_SINT8, 50}, {std::make_shared<IntegerEvent>(50)});
-    assert_decode({TYPE_UINT8, 50}, {std::make_shared<IntegerEvent>(50)});
-    assert_decode({TYPE_UINT8, 120}, {std::make_shared<IntegerEvent>(120)});
+    assert_decode({std::make_shared<IntegerEvent>(50)}, {TYPE_SINT8, 50});
+    assert_decode({std::make_shared<IntegerEvent>(50)}, {TYPE_UINT8, 50});
+    assert_decode({std::make_shared<IntegerEvent>(120)}, {TYPE_UINT8, 120});
 }
 
 TEST(EncodeDecode, int16)
@@ -545,9 +545,9 @@ TEST(EncodeDecode, int16)
     assert_encode_decode({std::make_shared<IntegerEvent>(-0x1000LL)}, {TYPE_SINT16, 0x00, 0xf0});
     assert_encode_decode({std::make_shared<IntegerEvent>(-0x8000LL)}, {TYPE_SINT16, 0x00, 0x80});
 
-    assert_decode({TYPE_SINT16, 50, 0}, {std::make_shared<IntegerEvent>(50)});
-    assert_decode({TYPE_UINT16, 50, 0}, {std::make_shared<IntegerEvent>(50)});
-    assert_decode({TYPE_UINT16, 120, 0}, {std::make_shared<IntegerEvent>(120)});
+    assert_decode({std::make_shared<IntegerEvent>(50)}, {TYPE_SINT16, 50, 0});
+    assert_decode({std::make_shared<IntegerEvent>(50)}, {TYPE_UINT16, 50, 0});
+    assert_decode({std::make_shared<IntegerEvent>(120)}, {TYPE_UINT16, 120, 0});
 }
 
 TEST(EncodeDecode, int24)
@@ -576,9 +576,9 @@ TEST(EncodeDecode, int24)
     assert_encode_decode({std::make_shared<IntegerEvent>(-0x100000LL)}, {TYPE_SINT24, 0x00, 0x00, 0xf0});
     assert_encode_decode({std::make_shared<IntegerEvent>(-0x800000LL)}, {TYPE_SINT24, 0x00, 0x00, 0x80});
 
-    assert_decode({TYPE_SINT24, 50, 0, 0}, {std::make_shared<IntegerEvent>(50)});
-    assert_decode({TYPE_UINT24, 50, 0, 0}, {std::make_shared<IntegerEvent>(50)});
-    assert_decode({TYPE_UINT24, 120, 0, 0}, {std::make_shared<IntegerEvent>(120)});
+    assert_decode({std::make_shared<IntegerEvent>(50)}, {TYPE_SINT24, 50, 0, 0});
+    assert_decode({std::make_shared<IntegerEvent>(50)}, {TYPE_UINT24, 50, 0, 0});
+    assert_decode({std::make_shared<IntegerEvent>(120)}, {TYPE_UINT24, 120, 0, 0});
 }
 
 TEST(EncodeDecode, int32)
@@ -608,9 +608,9 @@ TEST(EncodeDecode, int32)
     assert_encode_decode({std::make_shared<IntegerEvent>(-0x10000000LL)}, {TYPE_SINT32, 0x00, 0x00, 0x00, 0xf0});
     assert_encode_decode({std::make_shared<IntegerEvent>(-0x80000000LL)}, {TYPE_SINT32, 0x00, 0x00, 0x00, 0x80});
 
-    assert_decode({TYPE_SINT32, 50, 0, 0, 0}, {std::make_shared<IntegerEvent>(50)});
-    assert_decode({TYPE_UINT32, 50, 0, 0, 0}, {std::make_shared<IntegerEvent>(50)});
-    assert_decode({TYPE_UINT32, 120, 0, 0, 0}, {std::make_shared<IntegerEvent>(120)});
+    assert_decode({std::make_shared<IntegerEvent>(50)}, {TYPE_SINT32, 50, 0, 0, 0});
+    assert_decode({std::make_shared<IntegerEvent>(50)}, {TYPE_UINT32, 50, 0, 0, 0});
+    assert_decode({std::make_shared<IntegerEvent>(120)}, {TYPE_UINT32, 120, 0, 0, 0});
 }
 
 TEST(EncodeDecode, int40)
@@ -640,9 +640,9 @@ TEST(EncodeDecode, int40)
     assert_encode_decode({std::make_shared<IntegerEvent>(-0x1000000000LL)}, {TYPE_SINT40, 0x00, 0x00, 0x00, 0x00, 0xf0});
     assert_encode_decode({std::make_shared<IntegerEvent>(-0x8000000000LL)}, {TYPE_SINT40, 0x00, 0x00, 0x00, 0x00, 0x80});
 
-    assert_decode({TYPE_SINT40, 50, 0, 0, 0, 0}, {std::make_shared<IntegerEvent>(50)});
-    assert_decode({TYPE_UINT40, 50, 0, 0, 0, 0}, {std::make_shared<IntegerEvent>(50)});
-    assert_decode({TYPE_UINT40, 120, 0, 0, 0, 0}, {std::make_shared<IntegerEvent>(120)});
+    assert_decode({std::make_shared<IntegerEvent>(50)}, {TYPE_SINT40, 50, 0, 0, 0, 0});
+    assert_decode({std::make_shared<IntegerEvent>(50)}, {TYPE_UINT40, 50, 0, 0, 0, 0});
+    assert_decode({std::make_shared<IntegerEvent>(120)}, {TYPE_UINT40, 120, 0, 0, 0, 0});
 }
 
 TEST(EncodeDecode, int48)
@@ -672,9 +672,9 @@ TEST(EncodeDecode, int48)
     assert_encode_decode({std::make_shared<IntegerEvent>(-0x100000000000LL)}, {TYPE_SINT48, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0});
     assert_encode_decode({std::make_shared<IntegerEvent>(-0x800000000000LL)}, {TYPE_SINT48, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80});
 
-    assert_decode({TYPE_SINT48, 50, 0, 0, 0, 0, 0}, {std::make_shared<IntegerEvent>(50)});
-    assert_decode({TYPE_UINT48, 50, 0, 0, 0, 0, 0}, {std::make_shared<IntegerEvent>(50)});
-    assert_decode({TYPE_UINT48, 120, 0, 0, 0, 0, 0}, {std::make_shared<IntegerEvent>(120)});
+    assert_decode({std::make_shared<IntegerEvent>(50)}, {TYPE_SINT48, 50, 0, 0, 0, 0, 0});
+    assert_decode({std::make_shared<IntegerEvent>(50)}, {TYPE_UINT48, 50, 0, 0, 0, 0, 0});
+    assert_decode({std::make_shared<IntegerEvent>(120)}, {TYPE_UINT48, 120, 0, 0, 0, 0, 0});
 }
 
 TEST(EncodeDecode, int56)
@@ -704,9 +704,9 @@ TEST(EncodeDecode, int56)
     assert_encode_decode({std::make_shared<IntegerEvent>(-0x10000000000000LL)}, {TYPE_SINT56, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0});
     assert_encode_decode({std::make_shared<IntegerEvent>(-0x80000000000000LL)}, {TYPE_SINT56, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80});
 
-    assert_decode({TYPE_SINT56, 50, 0, 0, 0, 0, 0, 0}, {std::make_shared<IntegerEvent>(50)});
-    assert_decode({TYPE_UINT56, 50, 0, 0, 0, 0, 0, 0}, {std::make_shared<IntegerEvent>(50)});
-    assert_decode({TYPE_UINT56, 120, 0, 0, 0, 0, 0, 0}, {std::make_shared<IntegerEvent>(120)});
+    assert_decode({std::make_shared<IntegerEvent>(50)}, {TYPE_SINT56, 50, 0, 0, 0, 0, 0, 0});
+    assert_decode({std::make_shared<IntegerEvent>(50)}, {TYPE_UINT56, 50, 0, 0, 0, 0, 0, 0});
+    assert_decode({std::make_shared<IntegerEvent>(120)}, {TYPE_UINT56, 120, 0, 0, 0, 0, 0, 0});
 }
 
 TEST(EncodeDecode, int64)
@@ -735,9 +735,9 @@ TEST(EncodeDecode, int64)
     assert_encode_decode({std::make_shared<IntegerEvent>(-0x1000000000000000LL)}, {TYPE_SINT64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0});
     assert_encode_decode({std::make_shared<IntegerEvent>(-0x8000000000000000LL)}, {TYPE_SINT64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80});
 
-    assert_decode({TYPE_SINT64, 50, 0, 0, 0, 0, 0, 0, 0}, {std::make_shared<IntegerEvent>(50)});
-    assert_decode({TYPE_UINT64, 50, 0, 0, 0, 0, 0, 0, 0}, {std::make_shared<IntegerEvent>(50)});
-    assert_decode({TYPE_UINT64, 120, 0, 0, 0, 0, 0, 0, 0}, {std::make_shared<IntegerEvent>(120)});
+    assert_decode({std::make_shared<IntegerEvent>(50)}, {TYPE_SINT64, 50, 0, 0, 0, 0, 0, 0, 0});
+    assert_decode({std::make_shared<IntegerEvent>(50)}, {TYPE_UINT64, 50, 0, 0, 0, 0, 0, 0, 0});
+    assert_decode({std::make_shared<IntegerEvent>(120)}, {TYPE_UINT64, 120, 0, 0, 0, 0, 0, 0, 0});
 }
 
 TEST(EncodeDecode, BigNumber)
@@ -1712,14 +1712,15 @@ TEST(Examples, specification)
     assert_encode_decode({std::make_shared<StringEvent>("15 byte string!")},  {0x8f, 0x31, 0x35, 0x20, 0x62, 0x79, 0x74, 0x65, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x21});
 
     // Long String
-    assert_decode({0x68, 0x01}, {std::make_shared<StringEvent>("")});
-    assert_decode({0x68, 0x21, 0x61, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67}, {std::make_shared<StringEvent>("a string")});
-    assert_decode({0x68, 0x07, 0x61, 0x13, 0x20, 0x73, 0x74, 0x72, 0x0d, 0x69, 0x6e, 0x67},
+    assert_decode({std::make_shared<StringEvent>("")}, {0x68, 0x01});
+    assert_decode({std::make_shared<StringEvent>("a string")}, {0x68, 0x21, 0x61, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67});
+    assert_decode(
         {
             std::make_shared<StringChunkEvent>("a", CHUNK_HAS_NEXT),
             std::make_shared<StringChunkEvent>(" str", CHUNK_HAS_NEXT),
             std::make_shared<StringChunkEvent>("ing", CHUNK_LAST)
-        });
+        },
+        {0x68, 0x07, 0x61, 0x13, 0x20, 0x73, 0x74, 0x72, 0x0d, 0x69, 0x6e, 0x67});
     assert_encode_decode(
         {std::make_shared<StringEvent>("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ")},
         {0x68, 0x02, 0x02,
@@ -1737,12 +1738,12 @@ TEST(Examples, specification)
     assert_encode_decode({std::make_shared<IntegerEvent>(-100)},  {0x9c});
 
     // Integer
-    assert_decode({0x70, 0xb4}, {std::make_shared<IntegerEvent>(180)});
-    assert_decode({0x79, 0x18, 0xfc}, {std::make_shared<IntegerEvent>(-1000)});
-    assert_decode({0x71, 0x00, 0x80}, {std::make_shared<IntegerEvent>(0x8000)});
-    assert_decode({0x75, 0xbc, 0x9a, 0x78, 0x56, 0x34, 0x12}, {std::make_shared<IntegerEvent>(0x123456789abcLL)});
-    assert_decode({0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80}, {std::make_shared<IntegerEvent>(-0x8000000000000000LL)});
-    assert_decode({0x77, 0xda, 0xda, 0xda, 0xde, 0xd0, 0xd0, 0xd0, 0xde}, {std::make_shared<UIntegerEvent>(0xded0d0d0dedadada)});
+    assert_encode_decode({std::make_shared<IntegerEvent>(180)}, {0x70, 0xb4});
+    assert_encode_decode({std::make_shared<IntegerEvent>(-1000)}, {0x79, 0x18, 0xfc});
+    assert_encode_decode({std::make_shared<IntegerEvent>(0x8000)}, {0x71, 0x00, 0x80});
+    assert_encode_decode({std::make_shared<IntegerEvent>(0x123456789abcLL)}, {0x7d, 0xbc, 0x9a, 0x78, 0x56, 0x34, 0x12});
+    assert_encode_decode({std::make_shared<IntegerEvent>(-0x8000000000000000LL)}, {0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80});
+    assert_encode_decode({std::make_shared<UIntegerEvent>(0xded0d0d0dedadada)}, {0x77, 0xda, 0xda, 0xda, 0xde, 0xd0, 0xd0, 0xd0, 0xde});
 
     // 16 Bit Float
     assert_encode_decode({std::make_shared<FloatEvent>(1.125)},  {0x6a, 0x90, 0x3f});
