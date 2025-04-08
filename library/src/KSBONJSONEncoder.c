@@ -78,7 +78,7 @@ union num64_bits
 
 #define SHOULD_NOT_BE_EXPECTING_OBJECT_VALUE_OR_CHUNKING_STRING(CONTAINER) \
     unlikely_if((((CONTAINER)->isObject & !(CONTAINER)->isExpectingName) | (CONTAINER)->isChunkingString)) \
-        return (CONTAINER)->isChunkingString ? KSBONJSON_ENCODE_CHUNKING_STRING : KSBONJSON_ENCODE_EXPECTED_OBJECT_NAME
+        return (CONTAINER)->isChunkingString ? KSBONJSON_ENCODE_CHUNKING_STRING : KSBONJSON_ENCODE_EXPECTED_OBJECT_VALUE
 
 // ============================================================================
 // Utility

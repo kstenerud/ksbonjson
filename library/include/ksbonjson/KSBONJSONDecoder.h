@@ -122,14 +122,14 @@ typedef enum
     KSBONJSON_DECODE_INCOMPLETE = 1,
 
     /**
-     * A field was too big or long.
-     */
-    KSBONJSON_DECODE_TOO_BIG = 2,
-
-    /**
      * Not all containers have been closed yet (likely the document has been truncated).
      */
-    KSBONJSON_DECODE_UNCLOSED_CONTAINERS = 3,
+    KSBONJSON_DECODE_UNCLOSED_CONTAINERS = 2,
+
+    /**
+     * Tried to close too many containers.
+     */
+    KSBONJSON_DECODE_UNBALANCED_CONTAINERS = 3,
 
     /**
      * The document had too much container depth.
@@ -137,34 +137,34 @@ typedef enum
     KSBONJSON_DECODE_CONTAINER_DEPTH_EXCEEDED = 4,
 
     /**
-     * Tried to close too many containers.
-     */
-    KSBONJSON_DECODE_UNBALANCED_CONTAINERS = 5,
-
-    /**
      * Expected to find a string for an object element name.
      */
-    KSBONJSON_DECODE_EXPECTED_OBJECT_NAME = 6,
+    KSBONJSON_DECODE_EXPECTED_OBJECT_NAME = 5,
 
     /**
      * Got an end container while expecting an object element value.
      */
-    KSBONJSON_DECODE_EXPECTED_OBJECT_VALUE = 7,
+    KSBONJSON_DECODE_EXPECTED_OBJECT_VALUE = 6,
 
     /**
      * An element was successfully decoded, but contained invalid data.
      */
-    KSBONJSON_DECODE_INVALID_DATA = 8,
+    KSBONJSON_DECODE_INVALID_DATA = 7,
 
     /**
      * This name already exists in the current object.
      */
-    KSBONJSON_DECODE_DUPLICATE_OBJECT_NAME = 9,
+    KSBONJSON_DECODE_DUPLICATE_OBJECT_NAME = 8,
 
     /**
      * The value is out of range and cannot be stored without data loss.
      */
-    KSBONJSON_DECODE_VALUE_OUT_OF_RANGE = 10,
+    KSBONJSON_DECODE_VALUE_OUT_OF_RANGE = 9,
+
+    /**
+     * A string value contained a NUL character.
+     */
+    KSBONJSON_DECODE_NUL_CHARACTER = 10,
 
     /**
      * Generic error code that can be returned from a callback.

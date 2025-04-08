@@ -383,11 +383,11 @@ void assert_decode(std::vector<std::shared_ptr<Event>> expected_events, std::vec
     assert_events_equal(expected_events, decoder.events);
 }
 
-void assert_encode_failure(std::vector<std::shared_ptr<Event>> events)
+void assert_encode_result(ksbonjson_encodeStatus expectedResult, std::vector<std::shared_ptr<Event>> events)
 {
     if(REPORT_ENCODING)
     {
-        printf("\n[assert_encode_failure]\n");
+        printf("\n[assert_encode_result]\n");
     }
 
     KSBONJSONEncodeContext eContext;
@@ -396,30 +396,31 @@ void assert_encode_failure(std::vector<std::shared_ptr<Event>> events)
     ksbonjson_beginEncode(&eContext, addEncodedDataCallback, &eCtx);
     for (const std::shared_ptr<Event>& event: events)
     {
-        if((*event)(&eContext) != KSBONJSON_ENCODE_OK)
+        ksbonjson_encodeStatus result = (*event)(&eContext);
+        if(result == expectedResult)
         {
             SUCCEED();
             return;
         }
+        if(result != KSBONJSON_ENCODE_OK)
+        {
+            ASSERT_EQ(expectedResult, result);
+        }
     }
-    if(ksbonjson_endEncode(&eContext) != KSBONJSON_ENCODE_OK)
-    {
-        SUCCEED();
-        return;
-    }
-    FAIL();
+
+    ASSERT_EQ(expectedResult, ksbonjson_endEncode(&eContext));
 }
 
-void assert_decode_failure(std::vector<uint8_t> document)
+void assert_decode_result(ksbonjson_decodeStatus expectedResult, std::vector<uint8_t> document)
 {
     if(REPORT_DECODING)
     {
-        printf("\n[assert_decode_failure]\n");
+        printf("\n[assert_decode_result]\n");
     }
 
     Decoder decoder;
     size_t decodedOffset = 0;
-    ASSERT_NE(KSBONJSON_ENCODE_OK, decoder.decode(document, &decodedOffset));
+    ASSERT_EQ(expectedResult, decoder.decode(document, &decodedOffset));
 }
 
 // ============================================================================
@@ -920,7 +921,7 @@ TEST(Encoder, object_name)
 
     // Non-string is not allowed in the name field
 
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_EXPECTED_OBJECT_NAME,
     {
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<IntegerEvent>(1LL),
@@ -928,7 +929,7 @@ TEST(Encoder, object_name)
         std::make_shared<ContainerEndEvent>(),
     });
 
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_EXPECTED_OBJECT_NAME,
     {
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<IntegerEvent>(1000LL),
@@ -936,7 +937,7 @@ TEST(Encoder, object_name)
         std::make_shared<ContainerEndEvent>(),
     });
 
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_EXPECTED_OBJECT_NAME,
     {
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<IntegerEvent>(0x1000000000000000LL),
@@ -944,7 +945,7 @@ TEST(Encoder, object_name)
         std::make_shared<ContainerEndEvent>(),
     });
 
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_EXPECTED_OBJECT_NAME,
     {
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<BooleanEvent>(true),
@@ -952,7 +953,7 @@ TEST(Encoder, object_name)
         std::make_shared<ContainerEndEvent>(),
     });
 
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_EXPECTED_OBJECT_NAME,
     {
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<FloatEvent>(1.234),
@@ -960,7 +961,7 @@ TEST(Encoder, object_name)
         std::make_shared<ContainerEndEvent>(),
     });
 
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_EXPECTED_OBJECT_NAME,
     {
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<NullEvent>(),
@@ -968,7 +969,7 @@ TEST(Encoder, object_name)
         std::make_shared<ContainerEndEvent>(),
     });
 
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_EXPECTED_OBJECT_NAME,
     {
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<ObjectBeginEvent>(),
@@ -977,7 +978,7 @@ TEST(Encoder, object_name)
         std::make_shared<ContainerEndEvent>(),
     });
 
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_EXPECTED_OBJECT_NAME,
     {
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<ArrayBeginEvent>(),
@@ -989,14 +990,14 @@ TEST(Encoder, object_name)
 
 TEST(Encoder, object_value)
 {
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_EXPECTED_OBJECT_VALUE,
     {
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<StringEvent>("a"),
         std::make_shared<ContainerEndEvent>(),
     });
 
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_EXPECTED_OBJECT_VALUE,
     {
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<StringEvent>("a"),
@@ -1462,12 +1463,12 @@ TEST(Encoder, failed_to_add)
 
 TEST(Encoder, fail_string_chunking)
 {
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_CHUNKING_STRING,
     {
         std::make_shared<StringChunkEvent>("a", CHUNK_HAS_NEXT),
     });
 
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_CHUNKING_STRING,
     {
         std::make_shared<StringChunkEvent>("a", CHUNK_HAS_NEXT),
         std::make_shared<StringChunkEvent>("a", CHUNK_HAS_NEXT),
@@ -1476,7 +1477,7 @@ TEST(Encoder, fail_string_chunking)
         std::make_shared<StringChunkEvent>("a", CHUNK_HAS_NEXT),
     });
 
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_CHUNKING_STRING,
     {
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<StringChunkEvent>("a", CHUNK_HAS_NEXT),
@@ -1484,14 +1485,14 @@ TEST(Encoder, fail_string_chunking)
         std::make_shared<ContainerEndEvent>(),
     });
 
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_CHUNKING_STRING,
     {
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<StringChunkEvent>("a", CHUNK_HAS_NEXT),
         std::make_shared<ContainerEndEvent>(),
     });
 
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_CHUNKING_STRING,
     {
         std::make_shared<ArrayBeginEvent>(),
             std::make_shared<StringChunkEvent>("a", CHUNK_HAS_NEXT),
@@ -1501,12 +1502,12 @@ TEST(Encoder, fail_string_chunking)
 
 TEST(Encoder, fail_containers)
 {
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_CONTAINERS_ARE_STILL_OPEN,
     {
         std::make_shared<ObjectBeginEvent>(),
     });
 
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_CONTAINERS_ARE_STILL_OPEN,
     {
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<StringEvent>("a"),
@@ -1514,7 +1515,7 @@ TEST(Encoder, fail_containers)
         std::make_shared<ContainerEndEvent>(),
     });
 
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_CONTAINERS_ARE_STILL_OPEN,
     {
         std::make_shared<ObjectBeginEvent>(),
             std::make_shared<StringEvent>("a"),
@@ -1522,26 +1523,26 @@ TEST(Encoder, fail_containers)
         std::make_shared<ContainerEndEvent>(),
     });
 
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_CONTAINERS_ARE_STILL_OPEN,
     {
         std::make_shared<ArrayBeginEvent>(),
     });
 
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_CONTAINERS_ARE_STILL_OPEN,
     {
         std::make_shared<ArrayBeginEvent>(),
             std::make_shared<ArrayBeginEvent>(),
         std::make_shared<ContainerEndEvent>(),
     });
 
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_CONTAINERS_ARE_STILL_OPEN,
     {
         std::make_shared<ArrayBeginEvent>(),
             std::make_shared<ObjectBeginEvent>(),
         std::make_shared<ContainerEndEvent>(),
     });
 
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_EXPECTED_OBJECT_VALUE,
     {
         std::make_shared<ArrayBeginEvent>(),
             std::make_shared<ObjectBeginEvent>(),
@@ -1549,39 +1550,41 @@ TEST(Encoder, fail_containers)
         std::make_shared<ContainerEndEvent>(),
     });
 
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_CLOSED_TOO_MANY_CONTAINERS,
     {
         std::make_shared<ObjectBeginEvent>(),
         std::make_shared<ContainerEndEvent>(),
         std::make_shared<ContainerEndEvent>(),
     });
 
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_CLOSED_TOO_MANY_CONTAINERS,
     {
         std::make_shared<ArrayBeginEvent>(),
         std::make_shared<ContainerEndEvent>(),
         std::make_shared<ContainerEndEvent>(),
     });
 
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_CLOSED_TOO_MANY_CONTAINERS,
     {
         std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
             std::make_shared<ObjectBeginEvent>(),
             std::make_shared<ContainerEndEvent>(),
         std::make_shared<ContainerEndEvent>(),
         std::make_shared<ContainerEndEvent>(),
     });
 
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_CLOSED_TOO_MANY_CONTAINERS,
     {
         std::make_shared<ObjectBeginEvent>(),
+            std::make_shared<StringEvent>("a"),
             std::make_shared<ArrayBeginEvent>(),
             std::make_shared<ContainerEndEvent>(),
         std::make_shared<ContainerEndEvent>(),
         std::make_shared<ContainerEndEvent>(),
     });
 
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_CLOSED_TOO_MANY_CONTAINERS,
     {
         std::make_shared<ArrayBeginEvent>(),
             std::make_shared<ObjectBeginEvent>(),
@@ -1590,7 +1593,7 @@ TEST(Encoder, fail_containers)
         std::make_shared<ContainerEndEvent>(),
     });
 
-    assert_encode_failure(
+    assert_encode_result(KSBONJSON_ENCODE_CLOSED_TOO_MANY_CONTAINERS,
     {
         std::make_shared<ArrayBeginEvent>(),
             std::make_shared<ArrayBeginEvent>(),
@@ -1602,101 +1605,109 @@ TEST(Encoder, fail_containers)
 
 TEST(Decoder, unbalanced_containers)
 {
-    assert_decode_failure({TYPE_OBJECT});
-    assert_decode_failure({TYPE_OBJECT, TYPE_OBJECT, TYPE_END});
-    assert_decode_failure({TYPE_OBJECT, TYPE_ARRAY, TYPE_END});
-    assert_decode_failure({TYPE_ARRAY});
-    assert_decode_failure({TYPE_ARRAY, TYPE_ARRAY, TYPE_END});
-    assert_decode_failure({TYPE_ARRAY, TYPE_OBJECT, TYPE_END});
+    assert_decode_result(KSBONJSON_DECODE_UNCLOSED_CONTAINERS, {TYPE_OBJECT});
+    assert_decode_result(KSBONJSON_DECODE_UNCLOSED_CONTAINERS, {TYPE_OBJECT, TYPE_STRING0, TYPE_OBJECT, TYPE_END});
+    assert_decode_result(KSBONJSON_DECODE_UNCLOSED_CONTAINERS, {TYPE_OBJECT, TYPE_STRING0, TYPE_ARRAY, TYPE_END});
+    assert_decode_result(KSBONJSON_DECODE_UNCLOSED_CONTAINERS, {TYPE_ARRAY});
+    assert_decode_result(KSBONJSON_DECODE_UNCLOSED_CONTAINERS, {TYPE_ARRAY, TYPE_ARRAY, TYPE_END});
+    assert_decode_result(KSBONJSON_DECODE_UNCLOSED_CONTAINERS, {TYPE_ARRAY, TYPE_OBJECT, TYPE_END});
+}
+
+TEST(Decoder, fail_string)
+{
+    assert_decode_result(KSBONJSON_DECODE_NUL_CHARACTER, {TYPE_STRING1, 0x00});
+    assert_decode_result(KSBONJSON_DECODE_NUL_CHARACTER, {TYPE_STRING2, 'a', 0x00});
+    assert_decode_result(KSBONJSON_DECODE_NUL_CHARACTER, {TYPE_STRING2, 0x00, 'a'});
+    assert_decode_result(KSBONJSON_DECODE_NUL_CHARACTER, {TYPE_STRING, 0x41, 't', 'h', 'i', 's', ' ', 'i', 's', ' ', 'a', ' ', 's', 't', 'r', 0x00, 'n', 'g'});
 }
 
 TEST(Decoder, fail_big_number)
 {
     // NaN, Infinity
-    assert_decode_failure({TYPE_BIG_NUMBER, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
-    assert_decode_failure({TYPE_BIG_NUMBER, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
-    assert_decode_failure({TYPE_BIG_NUMBER, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
-    assert_decode_failure({TYPE_BIG_NUMBER, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
-    assert_decode_failure({TYPE_BIG_NUMBER, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
-    assert_decode_failure({TYPE_BIG_NUMBER, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
+    assert_decode_result(KSBONJSON_DECODE_INVALID_DATA, {TYPE_BIG_NUMBER, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
+    assert_decode_result(KSBONJSON_DECODE_INVALID_DATA, {TYPE_BIG_NUMBER, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
+    assert_decode_result(KSBONJSON_DECODE_INVALID_DATA, {TYPE_BIG_NUMBER, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
+    assert_decode_result(KSBONJSON_DECODE_INVALID_DATA, {TYPE_BIG_NUMBER, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
+    assert_decode_result(KSBONJSON_DECODE_INVALID_DATA, {TYPE_BIG_NUMBER, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
+    assert_decode_result(KSBONJSON_DECODE_INVALID_DATA, {TYPE_BIG_NUMBER, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
 
     // Significand too big (max 8 bytes)
-    assert_decode_failure({TYPE_BIG_NUMBER, 0x48, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
+    assert_decode_result(KSBONJSON_DECODE_VALUE_OUT_OF_RANGE, {TYPE_BIG_NUMBER, 0x48, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
 
     // Exponent too big (min -0x800000, max 0x7fffff)
-    assert_encode_failure({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 1,  0x800000))});
-    assert_encode_failure({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 1,  0x800000))});
-    assert_encode_failure({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 1, -0x800001))});
-    assert_encode_failure({std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 1, -0x800001))});
+    assert_encode_result(KSBONJSON_ENCODE_INVALID_DATA, {std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 1,  0x800000))});
+    assert_encode_result(KSBONJSON_ENCODE_INVALID_DATA, {std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 1,  0x800000))});
+    assert_encode_result(KSBONJSON_ENCODE_INVALID_DATA, {std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber( 1, 1, -0x800001))});
+    assert_encode_result(KSBONJSON_ENCODE_INVALID_DATA, {std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 1, -0x800001))});
 }
 
 TEST(Decoder, fail_float)
 {
-    assert_encode_failure({std::make_shared<FloatEvent>(NAN)});
-    assert_encode_failure({std::make_shared<FloatEvent>(INFINITY)});
-    assert_encode_failure({std::make_shared<FloatEvent>(-INFINITY)});
+    assert_encode_result(KSBONJSON_ENCODE_INVALID_DATA, {std::make_shared<FloatEvent>(NAN)});
+    assert_encode_result(KSBONJSON_ENCODE_INVALID_DATA, {std::make_shared<FloatEvent>(INFINITY)});
+    assert_encode_result(KSBONJSON_ENCODE_INVALID_DATA, {std::make_shared<FloatEvent>(-INFINITY)});
 }
 
 TEST(Decoder, fail_truncated)
 {
-    assert_decode_failure({TYPE_UINT8});
-    assert_decode_failure({TYPE_UINT16, 0x02});
-    assert_decode_failure({TYPE_UINT24, 0x02, 0x02});
-    assert_decode_failure({TYPE_UINT32, 0x02, 0x02, 0x02});
-    assert_decode_failure({TYPE_UINT40, 0x02, 0x02, 0x02, 0x02});
-    assert_decode_failure({TYPE_UINT48, 0x02, 0x02, 0x02, 0x02, 0x02});
-    assert_decode_failure({TYPE_UINT56, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02});
-    assert_decode_failure({TYPE_UINT64, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_UINT8});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_UINT16, 0x02});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_UINT24, 0x02, 0x02});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_UINT32, 0x02, 0x02, 0x02});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_UINT40, 0x02, 0x02, 0x02, 0x02});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_UINT48, 0x02, 0x02, 0x02, 0x02, 0x02});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_UINT56, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_UINT64, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02});
 
-    assert_decode_failure({TYPE_SINT8});
-    assert_decode_failure({TYPE_SINT16, 0x02});
-    assert_decode_failure({TYPE_SINT24, 0x02, 0x02});
-    assert_decode_failure({TYPE_SINT32, 0x02, 0x02, 0x02});
-    assert_decode_failure({TYPE_SINT40, 0x02, 0x02, 0x02, 0x02});
-    assert_decode_failure({TYPE_SINT48, 0x02, 0x02, 0x02, 0x02, 0x02});
-    assert_decode_failure({TYPE_SINT56, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02});
-    assert_decode_failure({TYPE_SINT64, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_SINT8});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_SINT16, 0x02});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_SINT24, 0x02, 0x02});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_SINT32, 0x02, 0x02, 0x02});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_SINT40, 0x02, 0x02, 0x02, 0x02});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_SINT48, 0x02, 0x02, 0x02, 0x02, 0x02});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_SINT56, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_SINT64, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02});
 
-    assert_decode_failure({TYPE_FLOAT16, 0x00});
-    assert_decode_failure({TYPE_FLOAT32, 0x00, 0x00, 0x00});
-    assert_decode_failure({TYPE_FLOAT64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_FLOAT16, 0x00});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_FLOAT32, 0x00, 0x00, 0x00});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_FLOAT64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
 
-    assert_decode_failure({TYPE_BIG_NUMBER, 0x08});
-    assert_decode_failure({TYPE_BIG_NUMBER, 0x10, 0x00});
-    assert_decode_failure({TYPE_BIG_NUMBER, 0x18, 0x00, 0x00});
-    assert_decode_failure({TYPE_BIG_NUMBER, 0x0c, 0x00});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_BIG_NUMBER, 0x08});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_BIG_NUMBER, 0x10, 0x00});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_BIG_NUMBER, 0x18, 0x00, 0x00});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_BIG_NUMBER, 0x0c, 0x00});
 
-    assert_decode_failure({TYPE_STRING1});
-    assert_decode_failure({TYPE_STRING2, 'a'});
-    assert_decode_failure({TYPE_STRING3, 'a', 'a'});
-    assert_decode_failure({TYPE_STRING4, 'a', 'a', 'a'});
-    assert_decode_failure({TYPE_STRING5, 'a', 'a', 'a', 'a'});
-    assert_decode_failure({TYPE_STRING6, 'a', 'a', 'a', 'a', 'a'});
-    assert_decode_failure({TYPE_STRING7, 'a', 'a', 'a', 'a', 'a', 'a'});
-    assert_decode_failure({TYPE_STRING8, 'a', 'a', 'a', 'a', 'a', 'a', 'a'});
-    assert_decode_failure({TYPE_STRING9, 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a'});
-    assert_decode_failure({TYPE_STRING10, 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a'});
-    assert_decode_failure({TYPE_STRING11, 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a'});
-    assert_decode_failure({TYPE_STRING12, 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a'});
-    assert_decode_failure({TYPE_STRING13, 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a'});
-    assert_decode_failure({TYPE_STRING14, 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a'});
-    assert_decode_failure({TYPE_STRING15, 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a'});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_STRING1});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_STRING2, 'a'});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_STRING3, 'a', 'a'});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_STRING4, 'a', 'a', 'a'});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_STRING5, 'a', 'a', 'a', 'a'});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_STRING6, 'a', 'a', 'a', 'a', 'a'});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_STRING7, 'a', 'a', 'a', 'a', 'a', 'a'});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_STRING8, 'a', 'a', 'a', 'a', 'a', 'a', 'a'});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_STRING9, 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a'});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_STRING10, 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a'});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_STRING11, 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a'});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_STRING12, 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a'});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_STRING13, 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a'});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_STRING14, 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a'});
+    assert_decode_result(KSBONJSON_DECODE_INCOMPLETE, {TYPE_STRING15, 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a'});
 }
 
 TEST(Decoder, fail_invalid_type_code)
 {
-    assert_decode_failure({0x65, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
-    assert_decode_failure({0x66, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
-    assert_decode_failure({0x67, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
-    assert_decode_failure({0x90, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
-    assert_decode_failure({0x91, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
-    assert_decode_failure({0x92, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
-    assert_decode_failure({0x93, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
-    assert_decode_failure({0x94, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
-    assert_decode_failure({0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
-    assert_decode_failure({0x96, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
-    assert_decode_failure({0x97, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
-    assert_decode_failure({0x98, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
+    assert_decode_result(KSBONJSON_DECODE_INVALID_DATA, {0x65, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
+    assert_decode_result(KSBONJSON_DECODE_INVALID_DATA, {0x66, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
+    assert_decode_result(KSBONJSON_DECODE_INVALID_DATA, {0x67, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
+    assert_decode_result(KSBONJSON_DECODE_INVALID_DATA, {0x90, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
+    assert_decode_result(KSBONJSON_DECODE_INVALID_DATA, {0x91, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
+    assert_decode_result(KSBONJSON_DECODE_INVALID_DATA, {0x92, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
+    assert_decode_result(KSBONJSON_DECODE_INVALID_DATA, {0x93, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
+    assert_decode_result(KSBONJSON_DECODE_INVALID_DATA, {0x94, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
+    assert_decode_result(KSBONJSON_DECODE_INVALID_DATA, {0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
+    assert_decode_result(KSBONJSON_DECODE_INVALID_DATA, {0x96, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
+    assert_decode_result(KSBONJSON_DECODE_INVALID_DATA, {0x97, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
+    assert_decode_result(KSBONJSON_DECODE_INVALID_DATA, {0x98, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff});
 }
 
 // ------------------------------------

@@ -26,7 +26,7 @@
 
 #include <ksbonjson/KSBONJSONDecoder.h>
 #include "KSBONJSONCommon.h"
-#include <string.h> // For memcpy()
+#include <string.h> // For memcpy() and strnlen()
 
 #pragma GCC diagnostic ignored "-Wdeclaration-after-statement"
 
@@ -84,6 +84,10 @@ typedef struct
 #define SHOULD_HAVE_ROOM_FOR_BYTES(BYTE_COUNT) \
     unlikely_if(ctx->bufferCurrent + (BYTE_COUNT) > ctx->bufferEnd) \
         return KSBONJSON_DECODE_INCOMPLETE
+
+#define SHOULD_NOT_CONTAIN_NUL_CHARS(STRING, LENGTH) \
+    unlikely_if(strnlen((const char*)(STRING), LENGTH) != (LENGTH)) \
+        return KSBONJSON_DECODE_NUL_CHARACTER
 
 
 // ============================================================================
@@ -264,7 +268,7 @@ static ksbonjson_decodeStatus decodeAndReportBigNumber(DecodeContext* const ctx)
 
     unlikely_if(significandLength > 8)
     {
-        return KSBONJSON_DECODE_TOO_BIG;
+        return KSBONJSON_DECODE_VALUE_OUT_OF_RANGE;
     }
     unlikely_if(significandLength == 0)
     {
@@ -289,6 +293,7 @@ static ksbonjson_decodeStatus decodeAndReportShortString(DecodeContext* const ct
     SHOULD_HAVE_ROOM_FOR_BYTES(length);
     const uint8_t* const begin = ctx->bufferCurrent;
     ctx->bufferCurrent += length;
+    SHOULD_NOT_CONTAIN_NUL_CHARS(begin, length);
     return ctx->callbacks->onString((const char*)begin, length, ctx->userData);
 }
 
@@ -302,6 +307,7 @@ static ksbonjson_decodeStatus decodeAndReportLongString(DecodeContext* const ctx
 
     const uint8_t* pos = ctx->bufferCurrent;
     ctx->bufferCurrent += length;
+    SHOULD_NOT_CONTAIN_NUL_CHARS(pos, length);
 
     likely_if(!moreChunksFollow)
     {
@@ -318,6 +324,7 @@ static ksbonjson_decodeStatus decodeAndReportLongString(DecodeContext* const ctx
         SHOULD_HAVE_ROOM_FOR_BYTES(length);
         pos = ctx->bufferCurrent;
         ctx->bufferCurrent += length;
+        SHOULD_NOT_CONTAIN_NUL_CHARS(pos, length);
         PROPAGATE_ERROR(ctx, ctx->callbacks->onStringChunk((const char*)pos, length, moreChunksFollow, ctx->userData));
     }
 
@@ -489,8 +496,6 @@ const char* ksbonjson_describeDecodeStatus(const ksbonjson_decodeStatus status)
             return "Successful completion";
         case KSBONJSON_DECODE_INCOMPLETE:
             return "Incomplete data (document was truncated?)";
-        case KSBONJSON_DECODE_TOO_BIG:
-            return "Decoded a value that was too big or long";
         case KSBONJSON_DECODE_UNCLOSED_CONTAINERS:
             return "Not all containers have been closed yet (likely the document has been truncated)";
         case KSBONJSON_DECODE_CONTAINER_DEPTH_EXCEEDED:
@@ -507,6 +512,8 @@ const char* ksbonjson_describeDecodeStatus(const ksbonjson_decodeStatus status)
             return "Encountered invalid data";
         case KSBONJSON_DECODE_DUPLICATE_OBJECT_NAME:
             return "This name already exists in the current object";
+        case KSBONJSON_DECODE_NUL_CHARACTER:
+            return "A string value contained a NUL character";
         case KSBONJSON_DECODE_VALUE_OUT_OF_RANGE:
             return "The value is out of range and cannot be stored without data loss";
         default:
