@@ -27,6 +27,9 @@
 #include <ksbonjson/KSBONJSONDecoder.h>
 #include "KSBONJSONCommon.h"
 #include <string.h> // For memcpy() and strnlen()
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif
 
 #pragma GCC diagnostic ignored "-Wdeclaration-after-statement"
 
@@ -114,6 +117,10 @@ static size_t decodeLengthFieldTotalByteCount(uint8_t header)
 {
 #if HAS_BUILTIN(__builtin_ctz)
     return (size_t)__builtin_ctz(header) + 1;
+#elif defined(_MSC_VER)
+    unsigned long tz = 0;
+    _BitScanForward(&tz, header);
+    return tz + 1;
 #else
     // Isolate lowest 1-bit
     header &= -header;

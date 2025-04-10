@@ -27,6 +27,9 @@
 #include <ksbonjson/KSBONJSONEncoder.h>
 #include "KSBONJSONCommon.h"
 #include <string.h> // For memcpy()
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif
 
 #pragma GCC diagnostic ignored "-Wdeclaration-after-statement"
 
@@ -116,6 +119,10 @@ static size_t leadingZeroBitsMax63(uint64_t value)
 
 #if HAS_BUILTIN(__builtin_clzll)
     return (size_t)__builtin_clzll(value);
+#elif defined(_MSC_VER)
+    unsigned long first1 = 0;
+    _BitScanReverse64(&first1, value);
+    return 63 - first1;
 #else
     // Smear set bits right
     value |= value >> 1;
