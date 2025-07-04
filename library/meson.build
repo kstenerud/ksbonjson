@@ -39,7 +39,7 @@ build_args = [
 # ======
 
 public_headers = include_directories('include')
-private_headers = include_directories('src')
+private_headers = include_directories('src', 'include/ksbonjson')
 
 build_args += [
   '-DPROJECT_NAME=' + meson.project_name(),
@@ -59,7 +59,7 @@ project_target = shared_library(
   install : true,
   c_args : build_args,
   gnu_symbol_visibility : 'hidden',
-  include_directories : public_headers,
+  include_directories : private_headers,
 )
 
 

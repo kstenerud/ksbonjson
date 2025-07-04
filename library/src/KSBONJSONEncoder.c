@@ -24,7 +24,7 @@
 // THE SOFTWARE.
 //
 
-#include <ksbonjson/KSBONJSONEncoder.h>
+#include "KSBONJSONEncoder.h"
 #include "KSBONJSONCommon.h"
 #include <string.h> // For memcpy()
 #ifdef _MSC_VER
