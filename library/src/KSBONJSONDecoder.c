@@ -111,10 +111,13 @@ static uint64_t fromLittleEndian(uint64_t v)
 
 /**
  * Get a length field's total byte count from its header.
- * Note: Undefined for header value 0x00.
+ * Note: Undefined for header value 0xff.
  */
 static size_t decodeLengthFieldTotalByteCount(uint8_t header)
 {
+    // Invert header: length field uses trailing 1s terminated by 0
+    header = (uint8_t)~header;
+
 #if HAS_BUILTIN(__builtin_ctz)
     return (size_t)__builtin_ctz(header) + 1;
 #elif defined(_MSC_VER)
@@ -139,7 +142,7 @@ static ksbonjson_decodeStatus decodeLengthPayload(DecodeContext* const ctx, uint
 {
     SHOULD_HAVE_ROOM_FOR_BYTES(1);
     const uint8_t header = *ctx->bufferCurrent;
-    unlikely_if(header == 0)
+    unlikely_if(header == 0xff)
     {
         ctx->bufferCurrent++;
         SHOULD_HAVE_ROOM_FOR_BYTES(8);

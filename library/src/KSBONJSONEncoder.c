@@ -247,18 +247,19 @@ static size_t encodeLengthField(uint64_t length,
 {
     uint64_t payload = (length << 1) | anotherChunkFollows;
 
-    unlikely_if(payload > 0x008fffffffffffff)
+    unlikely_if(payload > 0x00ffffffffffffffULL)
     {
         bits[0].b[0] = 7;
-        bits[0].b[7] = 0;
+        bits[0].b[7] = 0xff;
         bits[1].u64 = toLittleEndian(payload);
         return 9;
     }
 
     const size_t extraByteCount = calcLengthExtraByteCountNeeded(payload);
-    payload <<= 1;
-    payload |= 1;
-    payload <<= extraByteCount;
+    // Shift payload left to make room for terminating 0 and trailing 1s
+    payload <<= (1 + extraByteCount);
+    // Add trailing 1s (but not the terminating 0, which is already 0)
+    payload |= (1ULL << extraByteCount) - 1;
 
     bits[0].b[0] = 8;
     bits[1].u64 = toLittleEndian(payload);
