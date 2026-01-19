@@ -167,6 +167,21 @@ typedef enum
     KSBONJSON_DECODE_NUL_CHARACTER = 10,
 
     /**
+     * A length field was not encoded using the minimum number of bytes.
+     */
+    KSBONJSON_DECODE_NON_CANONICAL_LENGTH = 11,
+
+    /**
+     * The document is empty (zero bytes).
+     */
+    KSBONJSON_DECODE_EMPTY_DOCUMENT = 12,
+
+    /**
+     * There is data after the end of the top-level value.
+     */
+    KSBONJSON_DECODE_TRAILING_DATA = 13,
+
+    /**
      * Generic error code that can be returned from a callback.
      *
      * More specific error codes (> 100) may also be defined by the user if needed.

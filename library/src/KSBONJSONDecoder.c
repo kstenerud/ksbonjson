@@ -149,7 +149,13 @@ static ksbonjson_decodeStatus decodeLengthPayload(DecodeContext* const ctx, uint
         union number_bits bits;
         memcpy(bits.b, ctx->bufferCurrent, 8);
         ctx->bufferCurrent += 8;
-        *payloadBuffer = fromLittleEndian(bits.u64);
+        const uint64_t payload = fromLittleEndian(bits.u64);
+        // Canonical check: 9-byte encoding requires payload > 0x00ffffffffffffff
+        unlikely_if(payload <= 0x00ffffffffffffffULL)
+        {
+            return KSBONJSON_DECODE_NON_CANONICAL_LENGTH;
+        }
+        *payloadBuffer = payload;
         return KSBONJSON_DECODE_OK;
     }
 
@@ -158,7 +164,14 @@ static ksbonjson_decodeStatus decodeLengthPayload(DecodeContext* const ctx, uint
     union number_bits bits = {0};
     memcpy(bits.b, ctx->bufferCurrent, count);
     ctx->bufferCurrent += count;
-    *payloadBuffer = fromLittleEndian(bits.u64 >> count);
+    const uint64_t payload = fromLittleEndian(bits.u64 >> count);
+    // Canonical check: payload must require this many bytes
+    // For count > 1, payload must be > max value that fits in (count-1) bytes
+    unlikely_if(count > 1 && payload <= ((1ULL << (7 * (count - 1))) - 1))
+    {
+        return KSBONJSON_DECODE_NON_CANONICAL_LENGTH;
+    }
+    *payloadBuffer = payload;
     return KSBONJSON_DECODE_OK;
 }
 
@@ -313,6 +326,11 @@ static ksbonjson_decodeStatus decodeAndReportLongString(DecodeContext* const ctx
     PROPAGATE_ERROR(ctx, decodeLengthPayload(ctx, &lengthPayload));
     uint64_t length = lengthPayload >> 1;
     bool moreChunksFollow = (bool)(lengthPayload&1);
+    // Zero-length chunks with continuation are not allowed (DOS protection)
+    unlikely_if(length == 0 && moreChunksFollow)
+    {
+        return KSBONJSON_DECODE_INVALID_DATA;
+    }
     SHOULD_HAVE_ROOM_FOR_BYTES(length);
 
     const uint8_t* pos = ctx->bufferCurrent;
@@ -331,6 +349,11 @@ static ksbonjson_decodeStatus decodeAndReportLongString(DecodeContext* const ctx
         PROPAGATE_ERROR(ctx, decodeLengthPayload(ctx, &lengthPayload));
         length = lengthPayload >> 1;
         moreChunksFollow = (bool)(lengthPayload&1);
+        // Zero-length chunks with continuation are not allowed (DOS protection)
+        unlikely_if(length == 0 && moreChunksFollow)
+        {
+            return KSBONJSON_DECODE_INVALID_DATA;
+        }
         SHOULD_HAVE_ROOM_FOR_BYTES(length);
         pos = ctx->bufferCurrent;
         ctx->bufferCurrent += length;
@@ -454,6 +477,12 @@ static ksbonjson_decodeStatus decodeValue(DecodeContext* const ctx, const uint8_
 
 static ksbonjson_decodeStatus decodeDocument(DecodeContext* const ctx)
 {
+    // Empty document is invalid
+    unlikely_if(ctx->bufferCurrent >= ctx->bufferEnd)
+    {
+        return KSBONJSON_DECODE_EMPTY_DOCUMENT;
+    }
+
     static ksbonjson_decodeStatus (*decodeFuncs[2])(DecodeContext*, const uint8_t) =
     {
         decodeValue, decodeObjectName,
@@ -465,12 +494,25 @@ static ksbonjson_decodeStatus decodeDocument(DecodeContext* const ctx)
         const uint8_t typeCode = *ctx->bufferCurrent++;
         PROPAGATE_ERROR(ctx, decodeFuncs[container->isObject & container->isExpectingName](ctx, typeCode));
         container->isExpectingName = !container->isExpectingName;
+
+        // After completing the top-level value, stop decoding
+        likely_if(ctx->containerDepth == 0)
+        {
+            break;
+        }
     }
 
     unlikely_if(ctx->containerDepth > 0)
     {
         return KSBONJSON_DECODE_UNCLOSED_CONTAINERS;
     }
+
+    // Check for trailing data
+    unlikely_if(ctx->bufferCurrent < ctx->bufferEnd)
+    {
+        return KSBONJSON_DECODE_TRAILING_DATA;
+    }
+
     return ctx->callbacks->onEndData(ctx->userData);
 }
 
@@ -526,6 +568,12 @@ const char* ksbonjson_describeDecodeStatus(const ksbonjson_decodeStatus status)
             return "A string value contained a NUL character";
         case KSBONJSON_DECODE_VALUE_OUT_OF_RANGE:
             return "The value is out of range and cannot be stored without data loss";
+        case KSBONJSON_DECODE_NON_CANONICAL_LENGTH:
+            return "A length field was not encoded using the minimum number of bytes";
+        case KSBONJSON_DECODE_EMPTY_DOCUMENT:
+            return "The document is empty (zero bytes)";
+        case KSBONJSON_DECODE_TRAILING_DATA:
+            return "There is data after the end of the top-level value";
         default:
             return "(unknown status - was it a user-defined status code?)";
     }
