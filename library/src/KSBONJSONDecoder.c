@@ -52,9 +52,11 @@ union number_bits
 #pragma GCC diagnostic ignored "-Wpadded"
 typedef struct
 {
+    uint64_t elementsRemaining;  // Elements/pairs remaining in current chunk
     uint8_t isObject: 1;
     uint8_t isExpectingName: 1;
     uint8_t isChunkingString: 1;
+    uint8_t moreChunksFollow: 1;
 } ContainerState;
 
 typedef struct
@@ -364,9 +366,30 @@ static ksbonjson_decodeStatus decodeAndReportLongString(DecodeContext* const ctx
     return KSBONJSON_DECODE_OK;
 }
 
+// Parse a chunk header and set up the container state
+static ksbonjson_decodeStatus parseChunk(DecodeContext* const ctx, ContainerState* const container)
+{
+    uint64_t lengthPayload;
+    PROPAGATE_ERROR(ctx, decodeLengthPayload(ctx, &lengthPayload));
+
+    const uint64_t count = lengthPayload >> 1;
+    const bool moreChunksFollow = (bool)(lengthPayload & 1);
+
+    // Zero-count chunks with continuation are not allowed (DOS protection)
+    unlikely_if(count == 0 && moreChunksFollow)
+    {
+        return KSBONJSON_DECODE_INVALID_DATA;
+    }
+
+    container->elementsRemaining = count;
+    container->moreChunksFollow = moreChunksFollow;
+
+    return KSBONJSON_DECODE_OK;
+}
+
 static ksbonjson_decodeStatus beginArray(DecodeContext* const ctx)
 {
-    unlikely_if(ctx->containerDepth > KSBONJSON_MAX_CONTAINER_DEPTH)
+    unlikely_if(ctx->containerDepth >= KSBONJSON_MAX_CONTAINER_DEPTH)
     {
         return KSBONJSON_DECODE_CONTAINER_DEPTH_EXCEEDED;
     }
@@ -374,12 +397,27 @@ static ksbonjson_decodeStatus beginArray(DecodeContext* const ctx)
     ctx->containerDepth++;
     ctx->containers[ctx->containerDepth] = (ContainerState){0};
 
-    return ctx->callbacks->onBeginArray(ctx->userData);
+    // Parse first chunk
+    ContainerState* const container = &ctx->containers[ctx->containerDepth];
+    PROPAGATE_ERROR(ctx, parseChunk(ctx, container));
+
+    const size_t elementCountHint = (size_t)container->elementsRemaining;
+
+    PROPAGATE_ERROR(ctx, ctx->callbacks->onBeginArray(elementCountHint, ctx->userData));
+
+    // If empty array, immediately close it
+    if(container->elementsRemaining == 0 && !container->moreChunksFollow)
+    {
+        ctx->containerDepth--;
+        PROPAGATE_ERROR(ctx, ctx->callbacks->onEndContainer(ctx->userData));
+    }
+
+    return KSBONJSON_DECODE_OK;
 }
 
 static ksbonjson_decodeStatus beginObject(DecodeContext* const ctx)
 {
-    unlikely_if(ctx->containerDepth > KSBONJSON_MAX_CONTAINER_DEPTH)
+    unlikely_if(ctx->containerDepth >= KSBONJSON_MAX_CONTAINER_DEPTH)
     {
         return KSBONJSON_DECODE_CONTAINER_DEPTH_EXCEEDED;
     }
@@ -391,87 +429,152 @@ static ksbonjson_decodeStatus beginObject(DecodeContext* const ctx)
                                                 .isExpectingName = true,
                                             };
 
-    return ctx->callbacks->onBeginObject(ctx->userData);
+    // Parse first chunk
+    ContainerState* const container = &ctx->containers[ctx->containerDepth];
+    PROPAGATE_ERROR(ctx, parseChunk(ctx, container));
+
+    const size_t elementCountHint = (size_t)container->elementsRemaining;
+
+    PROPAGATE_ERROR(ctx, ctx->callbacks->onBeginObject(elementCountHint, ctx->userData));
+
+    // If empty object, immediately close it
+    if(container->elementsRemaining == 0 && !container->moreChunksFollow)
+    {
+        ctx->containerDepth--;
+        PROPAGATE_ERROR(ctx, ctx->callbacks->onEndContainer(ctx->userData));
+    }
+
+    return KSBONJSON_DECODE_OK;
 }
 
-static ksbonjson_decodeStatus endContainer(DecodeContext* const ctx)
+// Called when an element/pair is complete. Handles chunk transitions and container end.
+static ksbonjson_decodeStatus onElementComplete(DecodeContext* const ctx)
 {
-    unlikely_if(ctx->containerDepth <= 0)
+    if(ctx->containerDepth <= 0)
     {
-        return KSBONJSON_DECODE_UNBALANCED_CONTAINERS;
-    }
-    ContainerState* const container = &ctx->containers[ctx->containerDepth];
-    unlikely_if((container->isObject & !container->isExpectingName))
-    {
-        return KSBONJSON_DECODE_EXPECTED_OBJECT_VALUE;
+        return KSBONJSON_DECODE_OK;
     }
 
-    ctx->containerDepth--;
-    return ctx->callbacks->onEndContainer(ctx->userData);
+    ContainerState* const container = &ctx->containers[ctx->containerDepth];
+
+    // If elementsRemaining is 0, the container was already closed (empty container case)
+    if(container->elementsRemaining == 0)
+    {
+        return KSBONJSON_DECODE_OK;
+    }
+
+    container->elementsRemaining--;
+
+    if(container->elementsRemaining == 0)
+    {
+        if(container->moreChunksFollow)
+        {
+            // Parse next chunk
+            PROPAGATE_ERROR(ctx, parseChunk(ctx, container));
+        }
+
+        // If this was the final chunk (or became empty after parsing next chunk),
+        // check if we should end the container
+        if(container->elementsRemaining == 0 && !container->moreChunksFollow)
+        {
+            ctx->containerDepth--;
+            PROPAGATE_ERROR(ctx, ctx->callbacks->onEndContainer(ctx->userData));
+
+            // When returning to a parent object, we just completed a value (the container),
+            // so the parent should now expect a name
+            if(ctx->containerDepth > 0)
+            {
+                ContainerState* const parent = &ctx->containers[ctx->containerDepth];
+                if(parent->isObject)
+                {
+                    parent->isExpectingName = true;
+                }
+            }
+
+            // Recursively handle parent container element completion
+            return onElementComplete(ctx);
+        }
+    }
+
+    return KSBONJSON_DECODE_OK;
 }
 
 static ksbonjson_decodeStatus decodeObjectName(DecodeContext* const ctx, const uint8_t typeCode)
 {
-    switch(typeCode)
+    // Short strings: 0xe0-0xef
+    if(typeCode >= TYPE_STRING0 && typeCode <= TYPE_STRING15)
     {
-        case TYPE_END:
-            return endContainer(ctx);
-        case TYPE_STRING:
-            return decodeAndReportLongString(ctx);
-        case TYPE_STRING0:  case TYPE_STRING1:  case TYPE_STRING2:  case TYPE_STRING3:
-        case TYPE_STRING4:  case TYPE_STRING5:  case TYPE_STRING6:  case TYPE_STRING7:
-        case TYPE_STRING8:  case TYPE_STRING9:  case TYPE_STRING10: case TYPE_STRING11:
-        case TYPE_STRING12: case TYPE_STRING13: case TYPE_STRING14: case TYPE_STRING15:
-            return decodeAndReportShortString(ctx, typeCode);
-        default:
-            return KSBONJSON_DECODE_EXPECTED_OBJECT_NAME;
+        return decodeAndReportShortString(ctx, typeCode);
     }
+
+    // Long string: 0xf0
+    if(typeCode == TYPE_STRING)
+    {
+        return decodeAndReportLongString(ctx);
+    }
+
+    return KSBONJSON_DECODE_EXPECTED_OBJECT_NAME;
 }
 
 static ksbonjson_decodeStatus decodeValue(DecodeContext* const ctx, const uint8_t typeCode)
 {
+    // Small integers: 0x00-0xc8 (value = type_code - 100)
+    if(typeCode <= SMALLINT_MAX_TYPE_CODE)
+    {
+        const int64_t value = (int64_t)typeCode - SMALLINT_BIAS;
+        return ctx->callbacks->onSignedInteger(value, ctx->userData);
+    }
+
+    // Reserved: 0xc9-0xcf
+    if(typeCode <= TYPE_RESERVED_CF)
+    {
+        return KSBONJSON_DECODE_INVALID_DATA;
+    }
+
+    // Unsigned integers: 0xd0-0xd7
+    if(typeCode <= TYPE_UINT64)
+    {
+        return decodeAndReportUnsignedInteger(ctx, typeCode);
+    }
+
+    // Signed integers: 0xd8-0xdf
+    if(typeCode <= TYPE_SINT64)
+    {
+        return decodeAndReportSignedInteger(ctx, typeCode);
+    }
+
+    // Short strings: 0xe0-0xef
+    if(typeCode <= TYPE_STRING15)
+    {
+        return decodeAndReportShortString(ctx, typeCode);
+    }
+
+    // Remaining types: 0xf0-0xff
     switch(typeCode)
     {
         case TYPE_STRING:
             return decodeAndReportLongString(ctx);
-        case TYPE_STRING0:  case TYPE_STRING1:  case TYPE_STRING2:  case TYPE_STRING3:
-        case TYPE_STRING4:  case TYPE_STRING5:  case TYPE_STRING6:  case TYPE_STRING7:
-        case TYPE_STRING8:  case TYPE_STRING9:  case TYPE_STRING10: case TYPE_STRING11:
-        case TYPE_STRING12: case TYPE_STRING13: case TYPE_STRING14: case TYPE_STRING15:
-            return decodeAndReportShortString(ctx, typeCode);
-        case TYPE_UINT8:  case TYPE_UINT16: case TYPE_UINT24: case TYPE_UINT32:
-        case TYPE_UINT40: case TYPE_UINT48: case TYPE_UINT56: case TYPE_UINT64:
-            return decodeAndReportUnsignedInteger(ctx, typeCode);
-        case TYPE_SINT8:  case TYPE_SINT16: case TYPE_SINT24: case TYPE_SINT32:
-        case TYPE_SINT40: case TYPE_SINT48: case TYPE_SINT56: case TYPE_SINT64:
-            return decodeAndReportSignedInteger(ctx, typeCode);
+        case TYPE_BIG_NUMBER:
+            return decodeAndReportBigNumber(ctx);
         case TYPE_FLOAT16:
             return decodeAndReportFloat16(ctx);
         case TYPE_FLOAT32:
             return decodeAndReportFloat32(ctx);
         case TYPE_FLOAT64:
             return decodeAndReportFloat64(ctx);
-        case TYPE_BIG_NUMBER:
-            return decodeAndReportBigNumber(ctx);
-        case TYPE_ARRAY:
-            return beginArray(ctx);
-        case TYPE_OBJECT:
-            return beginObject(ctx);
-        case TYPE_END:
-            return endContainer(ctx);
+        case TYPE_NULL:
+            return ctx->callbacks->onNull(ctx->userData);
         case TYPE_FALSE:
             return ctx->callbacks->onBoolean(false, ctx->userData);
         case TYPE_TRUE:
             return ctx->callbacks->onBoolean(true, ctx->userData);
-        case TYPE_NULL:
-            return ctx->callbacks->onNull(ctx->userData);
-        case TYPE_RESERVED_65: case TYPE_RESERVED_66: case TYPE_RESERVED_67:
-        case TYPE_RESERVED_90: case TYPE_RESERVED_91: case TYPE_RESERVED_92:
-        case TYPE_RESERVED_93: case TYPE_RESERVED_94: case TYPE_RESERVED_95:
-        case TYPE_RESERVED_96: case TYPE_RESERVED_97: case TYPE_RESERVED_98:
-            return KSBONJSON_DECODE_INVALID_DATA;
+        case TYPE_ARRAY:
+            return beginArray(ctx);
+        case TYPE_OBJECT:
+            return beginObject(ctx);
         default:
-            return ctx->callbacks->onSignedInteger((int8_t)typeCode, ctx->userData);
+            // Reserved: 0xfa-0xff
+            return KSBONJSON_DECODE_INVALID_DATA;
     }
 }
 
@@ -483,20 +586,45 @@ static ksbonjson_decodeStatus decodeDocument(DecodeContext* const ctx)
         return KSBONJSON_DECODE_EMPTY_DOCUMENT;
     }
 
-    static ksbonjson_decodeStatus (*decodeFuncs[2])(DecodeContext*, const uint8_t) =
-    {
-        decodeValue, decodeObjectName,
-    };
-
     while(ctx->bufferCurrent < ctx->bufferEnd)
     {
         ContainerState* const container = &ctx->containers[ctx->containerDepth];
+
         const uint8_t typeCode = *ctx->bufferCurrent++;
-        PROPAGATE_ERROR(ctx, decodeFuncs[container->isObject & container->isExpectingName](ctx, typeCode));
-        container->isExpectingName = !container->isExpectingName;
+
+        if(container->isObject && container->isExpectingName)
+        {
+            PROPAGATE_ERROR(ctx, decodeObjectName(ctx, typeCode));
+            container->isExpectingName = false;
+        }
+        else
+        {
+            // Track depth before decoding to detect container creation
+            const int depthBefore = ctx->containerDepth;
+
+            PROPAGATE_ERROR(ctx, decodeValue(ctx, typeCode));
+
+            // For objects, toggle back to expecting name
+            if(ctx->containerDepth > 0)
+            {
+                ContainerState* const currentContainer = &ctx->containers[ctx->containerDepth];
+                if(currentContainer->isObject)
+                {
+                    currentContainer->isExpectingName = true;
+                }
+            }
+
+            // Handle element completion only if we didn't just create a container
+            // (containers handle their own closure; we only decrement for primitives
+            // or when a container was created and immediately closed as empty)
+            if(ctx->containerDepth <= depthBefore)
+            {
+                PROPAGATE_ERROR(ctx, onElementComplete(ctx));
+            }
+        }
 
         // After completing the top-level value, stop decoding
-        likely_if(ctx->containerDepth == 0)
+        if(ctx->containerDepth == 0)
         {
             break;
         }

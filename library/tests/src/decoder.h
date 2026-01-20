@@ -34,8 +34,8 @@ protected:
     virtual ksbonjson_decodeStatus onString(const char* value, size_t length) = 0;
     virtual ksbonjson_decodeStatus onStringChunk(const char* value, size_t length, bool isLastChunk) = 0;
     virtual ksbonjson_decodeStatus onNull() = 0;
-    virtual ksbonjson_decodeStatus onBeginObject() = 0;
-    virtual ksbonjson_decodeStatus onBeginArray() = 0;
+    virtual ksbonjson_decodeStatus onBeginObject(size_t elementCountHint) = 0;
+    virtual ksbonjson_decodeStatus onBeginArray(size_t elementCountHint) = 0;
     virtual ksbonjson_decodeStatus onEndContainer() = 0;
     virtual ksbonjson_decodeStatus onEndData() = 0;
 
@@ -55,8 +55,8 @@ private:
                                                 bool isLastChunk,
                                                 void* KSBONJSON_RESTRICT userData);
     friend ksbonjson_decodeStatus onNull(void* userData);
-    friend ksbonjson_decodeStatus onBeginObject(void* userData);
-    friend ksbonjson_decodeStatus onBeginArray(void* userData);
+    friend ksbonjson_decodeStatus onBeginObject(size_t elementCountHint, void* userData);
+    friend ksbonjson_decodeStatus onBeginArray(size_t elementCountHint, void* userData);
     friend ksbonjson_decodeStatus onEndContainer(void* userData);
     friend ksbonjson_decodeStatus onEndData(void* userData);
 };
@@ -98,13 +98,13 @@ ksbonjson_decodeStatus onStringChunk(const char* KSBONJSON_RESTRICT value,
 {
     return ((Decoder*)userData)->onStringChunk(value, length, isLastChunk);
 }
-ksbonjson_decodeStatus onBeginObject(void* userData)
+ksbonjson_decodeStatus onBeginObject(size_t elementCountHint, void* userData)
 {
-    return ((Decoder*)userData)->onBeginObject();
+    return ((Decoder*)userData)->onBeginObject(elementCountHint);
 }
-ksbonjson_decodeStatus onBeginArray(void* userData)
+ksbonjson_decodeStatus onBeginArray(size_t elementCountHint, void* userData)
 {
-    return ((Decoder*)userData)->onBeginArray();
+    return ((Decoder*)userData)->onBeginArray(elementCountHint);
 }
 ksbonjson_decodeStatus onEndContainer(void* userData)
 {

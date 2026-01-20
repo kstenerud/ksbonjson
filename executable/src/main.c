@@ -239,16 +239,20 @@ static ksbonjson_encodeStatus parseJsonElement(json_object *obj, KSBONJSONEncode
     switch (json_object_get_type(obj))
     {
         case json_type_array:
-            PROPAGATE_ENCODE_ERROR(ksbonjson_beginArray(ctx));
+        {
+            const size_t array_length = json_object_array_length(obj);
+            PROPAGATE_ENCODE_ERROR(ksbonjson_beginArray(ctx, array_length, false));
             PROPAGATE_ENCODE_ERROR(parseJsonArray(obj, ctx));
-            PROPAGATE_ENCODE_ERROR(ksbonjson_endContainer(ctx));
             break;
+        }
 
         case json_type_object:
-            PROPAGATE_ENCODE_ERROR(ksbonjson_beginObject(ctx));
+        {
+            const size_t pair_count = json_object_object_length(obj);
+            PROPAGATE_ENCODE_ERROR(ksbonjson_beginObject(ctx, pair_count, false));
             PROPAGATE_ENCODE_ERROR(parseJsonObject(obj, ctx));
-            PROPAGATE_ENCODE_ERROR(ksbonjson_endContainer(ctx));
             break;
+        }
 
         case json_type_null:
             PROPAGATE_ENCODE_ERROR(ksbonjson_addNull(ctx));
@@ -509,8 +513,9 @@ static ksbonjson_decodeStatus onStringChunk(const char* KSBONJSON_RESTRICT value
     return result;
 }
 
-static ksbonjson_decodeStatus onBeginObject(void* userData)
+static ksbonjson_decodeStatus onBeginObject(size_t elementCountHint, void* userData)
 {
+    MARK_UNUSED(elementCountHint);
     DecoderContext* const ctx = (DecoderContext*)userData;
     json_object* const obj = json_object_new_object();
     PROPAGATE_DECODE_ERROR(addObject(ctx, obj));
@@ -522,8 +527,9 @@ static ksbonjson_decodeStatus onBeginObject(void* userData)
     return KSBONJSON_DECODE_OK;
 }
 
-static ksbonjson_decodeStatus onBeginArray(void* userData)
+static ksbonjson_decodeStatus onBeginArray(size_t elementCountHint, void* userData)
 {
+    MARK_UNUSED(elementCountHint);
     DecoderContext* const ctx = (DecoderContext*)userData;
     json_object* const obj = json_object_new_array();
     PROPAGATE_DECODE_ERROR(addObject(ctx, obj));

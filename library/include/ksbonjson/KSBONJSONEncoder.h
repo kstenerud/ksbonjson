@@ -157,6 +157,21 @@ typedef enum
     KSBONJSON_ENCODE_TOO_BIG = 8,
 
     /**
+     * More elements were added than the chunk count specified.
+     */
+    KSBONJSON_ENCODE_CHUNK_ELEMENT_COUNT_EXCEEDED = 9,
+
+    /**
+     * Attempted to continue a chunk when no more chunks are expected.
+     */
+    KSBONJSON_ENCODE_NO_MORE_CHUNKS_EXPECTED = 10,
+
+    /**
+     * Attempted to continue a chunk before the current one is complete.
+     */
+    KSBONJSON_ENCODE_CURRENT_CHUNK_NOT_COMPLETE = 11,
+
+    /**
      * Generic error code that can be returned from addEncodedData().
      *
      * More specific error codes (> 100) may also be defined by the user if needed.
@@ -180,9 +195,11 @@ typedef ksbonjson_encodeStatus (*KSBONJSONAddEncodedDataFunc)(const uint8_t* KSB
 #pragma GCC diagnostic ignored "-Wpadded"
 typedef struct
 {
+    uint64_t elementsRemaining;  // Elements/pairs remaining in current chunk
     uint8_t isObject: 1;
     uint8_t isExpectingName: 1;
     uint8_t isChunkingString: 1;
+    uint8_t moreChunksFollow: 1;
 } KSBONJSONContainerState;
 
 typedef struct
@@ -320,28 +337,72 @@ KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addBONJSONDocument(KSBONJSONEn
                                                                      size_t documentLength);
 
 /**
- * Begin a new object container.
+ * Begin a new object container with a chunk.
+ *
+ * Objects use chunked encoding: each chunk specifies how many key-value pairs follow.
+ * For single-chunk objects (most common), pass moreChunksFollow=false.
+ * For multi-chunk objects, pass moreChunksFollow=true and call ksbonjson_continueObject
+ * after adding pairCount pairs.
+ *
+ * The container closes automatically when the final chunk's pairs are added.
  *
  * @param context The encoding context.
- * @return KSBONJSON_ENCODER_OK if the process was successful.
+ * @param pairCount Number of key-value pairs in this chunk.
+ * @param moreChunksFollow True if more chunks will follow this one.
+ * @return KSBONJSON_ENCODE_OK if the process was successful.
  */
-KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_beginObject(KSBONJSONEncodeContext* context);
+KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_beginObject(KSBONJSONEncodeContext* context,
+                                                               size_t pairCount,
+                                                               bool moreChunksFollow);
 
 /**
- * Begin a new array container.
+ * Continue an object with another chunk.
+ *
+ * Must be called after the previous chunk's pairs have been added, and only
+ * if the previous chunk had moreChunksFollow=true.
  *
  * @param context The encoding context.
- * @return KSBONJSON_ENCODER_OK if the process was successful.
+ * @param pairCount Number of key-value pairs in this chunk.
+ * @param moreChunksFollow True if more chunks will follow this one.
+ * @return KSBONJSON_ENCODE_OK if the process was successful.
  */
-KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_beginArray(KSBONJSONEncodeContext* context);
+KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_continueObject(KSBONJSONEncodeContext* context,
+                                                                  size_t pairCount,
+                                                                  bool moreChunksFollow);
 
 /**
- * End the current container and return to the next higher level.
+ * Begin a new array container with a chunk.
+ *
+ * Arrays use chunked encoding: each chunk specifies how many elements follow.
+ * For single-chunk arrays (most common), pass moreChunksFollow=false.
+ * For multi-chunk arrays, pass moreChunksFollow=true and call ksbonjson_continueArray
+ * after adding elementCount elements.
+ *
+ * The container closes automatically when the final chunk's elements are added.
  *
  * @param context The encoding context.
- * @return KSBONJSON_ENCODER_OK if the process was successful.
+ * @param elementCount Number of elements in this chunk.
+ * @param moreChunksFollow True if more chunks will follow this one.
+ * @return KSBONJSON_ENCODE_OK if the process was successful.
  */
-KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_endContainer(KSBONJSONEncodeContext* context);
+KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_beginArray(KSBONJSONEncodeContext* context,
+                                                              size_t elementCount,
+                                                              bool moreChunksFollow);
+
+/**
+ * Continue an array with another chunk.
+ *
+ * Must be called after the previous chunk's elements have been added, and only
+ * if the previous chunk had moreChunksFollow=true.
+ *
+ * @param context The encoding context.
+ * @param elementCount Number of elements in this chunk.
+ * @param moreChunksFollow True if more chunks will follow this one.
+ * @return KSBONJSON_ENCODE_OK if the process was successful.
+ */
+KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_continueArray(KSBONJSONEncodeContext* context,
+                                                                 size_t elementCount,
+                                                                 bool moreChunksFollow);
 
 /**
  * Get a description for an encoding status code.

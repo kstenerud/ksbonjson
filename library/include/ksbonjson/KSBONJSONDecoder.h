@@ -291,18 +291,28 @@ typedef struct KSBONJSONDecodeCallbacks
     /**
      * Called when a new object is encountered.
      *
+     * The elementCountHint provides the number of key-value pairs in the first chunk.
+     * This can be used as a hint for pre-allocation. For single-chunk objects (most common),
+     * this is the total pair count. For multi-chunk objects, additional pairs may follow.
+     *
+     * @param elementCountHint Number of key-value pairs in the first chunk (pre-allocation hint).
      * @param userData Data that was specified when calling ksbonjson_decode().
      * @return KSBONJSON_DECODE_OK if decoding should continue.
      */
-    ksbonjson_decodeStatus (*onBeginObject)(void* userData);
+    ksbonjson_decodeStatus (*onBeginObject)(size_t elementCountHint, void* userData);
 
     /**
      * Called when a new array is encountered.
      *
+     * The elementCountHint provides the number of elements in the first chunk.
+     * This can be used as a hint for pre-allocation. For single-chunk arrays (most common),
+     * this is the total element count. For multi-chunk arrays, additional elements may follow.
+     *
+     * @param elementCountHint Number of elements in the first chunk (pre-allocation hint).
      * @param userData Data that was specified when calling ksbonjson_decode().
      * @return KSBONJSON_DECODE_OK if decoding should continue.
      */
-    ksbonjson_decodeStatus (*onBeginArray)(void* userData);
+    ksbonjson_decodeStatus (*onBeginArray)(size_t elementCountHint, void* userData);
 
     /**
      * Called when leaving the current container and returning to the next

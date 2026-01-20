@@ -79,9 +79,9 @@ union num64_bits
     unlikely_if((((CONTAINER)->isObject & (CONTAINER)->isExpectingName) | (CONTAINER)->isChunkingString)) \
         return (CONTAINER)->isChunkingString ? KSBONJSON_ENCODE_CHUNKING_STRING : KSBONJSON_ENCODE_EXPECTED_OBJECT_NAME
 
-#define SHOULD_NOT_BE_EXPECTING_OBJECT_VALUE_OR_CHUNKING_STRING(CONTAINER) \
-    unlikely_if((((CONTAINER)->isObject & !(CONTAINER)->isExpectingName) | (CONTAINER)->isChunkingString)) \
-        return (CONTAINER)->isChunkingString ? KSBONJSON_ENCODE_CHUNKING_STRING : KSBONJSON_ENCODE_EXPECTED_OBJECT_VALUE
+#define SHOULD_HAVE_ELEMENTS_REMAINING(CONTAINER) \
+    unlikely_if((CONTAINER)->elementsRemaining == 0 && ctx->containerDepth > 0) \
+        return KSBONJSON_ENCODE_CHUNK_ELEMENT_COUNT_EXCEEDED
 
 // ============================================================================
 // Utility
@@ -202,20 +202,6 @@ static ksbonjson_encodeStatus addEncodedByte(KSBONJSONEncodeContext* const ctx, 
     return addEncodedBytes(ctx, &value, 1);
 }
 
-static ksbonjson_encodeStatus beginContainer(KSBONJSONEncodeContext* const ctx,
-                                             const uint8_t typeCode,
-                                             const KSBONJSONContainerState containerState)
-{
-    KSBONJSONContainerState* const container = getContainer(ctx);
-    SHOULD_NOT_BE_EXPECTING_OBJECT_NAME_OR_CHUNKING_STRING(container);
-    container->isExpectingName = true;
-
-    ctx->containerDepth++;
-    ctx->containers[ctx->containerDepth] = containerState;
-
-    return addEncodedByte(ctx, typeCode);
-}
-
 static void encodeIntegerIntoBytes(uint64_t value, uint8_t* bytes, size_t byteCount)
 {
     value = toLittleEndian(value);
@@ -238,7 +224,28 @@ static ksbonjson_encodeStatus encodePrimitiveNumeric(KSBONJSONEncodeContext* con
 
 static ksbonjson_encodeStatus encodeSmallInt(KSBONJSONEncodeContext* const ctx, int64_t value)
 {
-    return addEncodedByte(ctx, (uint8_t)value);
+    // Small int encoding: type_code = value + SMALLINT_BIAS
+    return addEncodedByte(ctx, (uint8_t)(value + SMALLINT_BIAS));
+}
+
+// Called after adding an element to a container to track counts and auto-close
+static void onElementAdded(KSBONJSONEncodeContext* const ctx)
+{
+    if(ctx->containerDepth > 0)
+    {
+        KSBONJSONContainerState* const container = &ctx->containers[ctx->containerDepth];
+        if(container->elementsRemaining > 0)
+        {
+            container->elementsRemaining--;
+            // Auto-close container when final chunk is complete
+            if(container->elementsRemaining == 0 && !container->moreChunksFollow)
+            {
+                ctx->containerDepth--;
+                // Notify parent that this container (as an element) was added
+                onElementAdded(ctx);
+            }
+        }
+    }
 }
 
 static size_t encodeLengthField(uint64_t length,
@@ -297,6 +304,85 @@ static ksbonjson_encodeStatus encodeTypeAndLength(KSBONJSONEncodeContext* const 
     return addEncodedBytes(ctx, ptr, byteCount);
 }
 
+static ksbonjson_encodeStatus beginContainer(KSBONJSONEncodeContext* const ctx,
+                                             const uint8_t typeCode,
+                                             const size_t elementCount,
+                                             const bool moreChunksFollow,
+                                             const KSBONJSONContainerState containerState)
+{
+    KSBONJSONContainerState* const container = getContainer(ctx);
+    SHOULD_NOT_BE_EXPECTING_OBJECT_NAME_OR_CHUNKING_STRING(container);
+    SHOULD_HAVE_ELEMENTS_REMAINING(container);
+
+    // Zero-count chunks with continuation are not allowed (DOS protection)
+    unlikely_if(elementCount == 0 && moreChunksFollow)
+    {
+        return KSBONJSON_ENCODE_INVALID_DATA;
+    }
+
+    container->isExpectingName = true;
+
+    ctx->containerDepth++;
+    ctx->containers[ctx->containerDepth] = containerState;
+    ctx->containers[ctx->containerDepth].elementsRemaining = elementCount;
+    ctx->containers[ctx->containerDepth].moreChunksFollow = moreChunksFollow;
+
+    // Emit type code + chunk header
+    PROPAGATE_ERROR(encodeTypeAndLength(ctx, typeCode, elementCount, moreChunksFollow));
+
+    // If empty container (count=0, continuation=0), immediately pop
+    if(elementCount == 0 && !moreChunksFollow)
+    {
+        ctx->containerDepth--;
+        onElementAdded(ctx);
+    }
+
+    return KSBONJSON_ENCODE_OK;
+}
+
+static ksbonjson_encodeStatus continueContainer(KSBONJSONEncodeContext* const ctx,
+                                                const size_t elementCount,
+                                                const bool moreChunksFollow)
+{
+    unlikely_if(ctx->containerDepth <= 0)
+    {
+        return KSBONJSON_ENCODE_CLOSED_TOO_MANY_CONTAINERS;
+    }
+
+    KSBONJSONContainerState* const container = getContainer(ctx);
+
+    // Must be at the end of a chunk that expected more chunks
+    unlikely_if(container->elementsRemaining != 0)
+    {
+        return KSBONJSON_ENCODE_CURRENT_CHUNK_NOT_COMPLETE;
+    }
+    unlikely_if(!container->moreChunksFollow)
+    {
+        return KSBONJSON_ENCODE_NO_MORE_CHUNKS_EXPECTED;
+    }
+
+    // Zero-count chunks with continuation are not allowed (DOS protection)
+    unlikely_if(elementCount == 0 && moreChunksFollow)
+    {
+        return KSBONJSON_ENCODE_INVALID_DATA;
+    }
+
+    container->elementsRemaining = elementCount;
+    container->moreChunksFollow = moreChunksFollow;
+
+    // Emit chunk header
+    PROPAGATE_ERROR(encodeLength(ctx, elementCount, moreChunksFollow));
+
+    // If this is an empty final chunk, pop the container
+    if(elementCount == 0 && !moreChunksFollow)
+    {
+        ctx->containerDepth--;
+        onElementAdded(ctx);
+    }
+
+    return KSBONJSON_ENCODE_OK;
+}
+
 
 // ============================================================================
 // API
@@ -326,9 +412,19 @@ ksbonjson_encodeStatus ksbonjson_endEncode(KSBONJSONEncodeContext* const ctx)
 
 ksbonjson_encodeStatus ksbonjson_terminateDocument(KSBONJSONEncodeContext* const ctx)
 {
+    // Best-effort termination: emit empty final chunks to close all open containers
     while(ctx->containerDepth > 0)
     {
-        PROPAGATE_ERROR(ksbonjson_endContainer(ctx));
+        KSBONJSONContainerState* const container = getContainer(ctx);
+
+        // If expecting a name or value in an object, we're in an inconsistent state,
+        // but we try to close anyway
+        if(container->moreChunksFollow || container->elementsRemaining > 0)
+        {
+            // Emit an empty final chunk to close the container
+            PROPAGATE_ERROR(encodeLength(ctx, 0, false));
+        }
+        ctx->containerDepth--;
     }
     return KSBONJSON_ENCODE_OK;
 }
@@ -337,20 +433,26 @@ ksbonjson_encodeStatus ksbonjson_addBoolean(KSBONJSONEncodeContext* const ctx, c
 {
     KSBONJSONContainerState* const container = getContainer(ctx);
     SHOULD_NOT_BE_EXPECTING_OBJECT_NAME_OR_CHUNKING_STRING(container);
-    container->isExpectingName = true;
+    SHOULD_HAVE_ELEMENTS_REMAINING(container);
+    container->isExpectingName = container->isObject; // Objects: expect next key
 
-    return addEncodedByte(ctx, value ? TYPE_TRUE : TYPE_FALSE);
+    PROPAGATE_ERROR(addEncodedByte(ctx, value ? TYPE_TRUE : TYPE_FALSE));
+    onElementAdded(ctx);
+    return KSBONJSON_ENCODE_OK;
 }
 
 ksbonjson_encodeStatus ksbonjson_addUnsignedInteger(KSBONJSONEncodeContext* const ctx, const uint64_t value)
 {
     KSBONJSONContainerState* const container = getContainer(ctx);
     SHOULD_NOT_BE_EXPECTING_OBJECT_NAME_OR_CHUNKING_STRING(container);
-    container->isExpectingName = true;
+    SHOULD_HAVE_ELEMENTS_REMAINING(container);
+    container->isExpectingName = container->isObject; // Objects: expect next key
 
-    if(value <= SMALLINT_POSITIVE_EDGE)
+    if(value <= SMALLINT_MAX)
     {
-        return encodeSmallInt(ctx, (int64_t)value);
+        PROPAGATE_ERROR(encodeSmallInt(ctx, (int64_t)value));
+        onElementAdded(ctx);
+        return KSBONJSON_ENCODE_OK;
     }
 
     const size_t byteCount = requiredUnsignedIntegerBytesMin1(value);
@@ -359,18 +461,23 @@ ksbonjson_encodeStatus ksbonjson_addUnsignedInteger(KSBONJSONEncodeContext* cons
     const uint8_t isMSBSet = (uint8_t)(value >> (byteCount * 8 - 1));
     const uint8_t typeCode = (uint8_t)(TYPE_SINT8 - isMSBSet * 8);
 
-    return encodePrimitiveNumeric(ctx, (uint8_t)(typeCode + byteCount - 1), value, byteCount);
+    PROPAGATE_ERROR(encodePrimitiveNumeric(ctx, (uint8_t)(typeCode + byteCount - 1), value, byteCount));
+    onElementAdded(ctx);
+    return KSBONJSON_ENCODE_OK;
 }
 
 ksbonjson_encodeStatus ksbonjson_addSignedInteger(KSBONJSONEncodeContext* const ctx, const int64_t value)
 {
     KSBONJSONContainerState* const container = getContainer(ctx);
     SHOULD_NOT_BE_EXPECTING_OBJECT_NAME_OR_CHUNKING_STRING(container);
-    container->isExpectingName = true;
+    SHOULD_HAVE_ELEMENTS_REMAINING(container);
+    container->isExpectingName = container->isObject; // Objects: expect next key
 
-    if( (uint64_t)(value-SMALLINT_NEGATIVE_EDGE) <= (SMALLINT_POSITIVE_EDGE-SMALLINT_NEGATIVE_EDGE) )
+    if( (uint64_t)(value-SMALLINT_MIN) <= (uint64_t)(SMALLINT_MAX-SMALLINT_MIN) )
     {
-        return encodeSmallInt(ctx, value);
+        PROPAGATE_ERROR(encodeSmallInt(ctx, value));
+        onElementAdded(ctx);
+        return KSBONJSON_ENCODE_OK;
     }
 
     size_t byteCount = requiredSignedIntegerBytesMin1(value);
@@ -383,7 +490,9 @@ ksbonjson_encodeStatus ksbonjson_addSignedInteger(KSBONJSONEncodeContext* const 
     byteCount -= isPositiveAndHighByteIs0;
     const uint8_t typeCode = (uint8_t)(TYPE_SINT8 + byteCount - 1 - 8*isPositiveAndHighByteIs0);
 
-    return encodePrimitiveNumeric(ctx, typeCode, (uint64_t)value, byteCount);
+    PROPAGATE_ERROR(encodePrimitiveNumeric(ctx, typeCode, (uint64_t)value, byteCount));
+    onElementAdded(ctx);
+    return KSBONJSON_ENCODE_OK;
 }
 
 ksbonjson_encodeStatus ksbonjson_addFloat(KSBONJSONEncodeContext* const ctx, const double value)
@@ -394,12 +503,14 @@ ksbonjson_encodeStatus ksbonjson_addFloat(KSBONJSONEncodeContext* const ctx, con
 #pragma GCC diagnostic ignored "-Wfloat-equal"
     if((double)asInt == value)
     {
+        // Note: addSignedInteger already handles element counting
         return ksbonjson_addSignedInteger(ctx, asInt);
     }
 #pragma GCC diagnostic pop
 
     KSBONJSONContainerState* const container = getContainer(ctx);
     SHOULD_NOT_BE_EXPECTING_OBJECT_NAME_OR_CHUNKING_STRING(container);
+    SHOULD_HAVE_ELEMENTS_REMAINING(container);
 
     union num64_bits b64 = {.f64 = value};
     unlikely_if((b64.u64 & 0x7ff0000000000000ULL) == 0x7ff0000000000000ULL)
@@ -408,7 +519,7 @@ ksbonjson_encodeStatus ksbonjson_addFloat(KSBONJSONEncodeContext* const ctx, con
         return KSBONJSON_ENCODE_INVALID_DATA;
     }
 
-    container->isExpectingName = true;
+    container->isExpectingName = container->isObject; // Objects: expect next key
 
     // Choose optimal float size
     const union num32_bits b32 = { .f32 = (float)value };
@@ -428,18 +539,23 @@ ksbonjson_encodeStatus ksbonjson_addFloat(KSBONJSONEncodeContext* const ctx, con
     const uint32_t as16Or32Bit = b32.u32 >> (16*isF16);
     b64.u64 = (b64.u64&(~mask)) | (as16Or32Bit & mask);
 
-    return encodePrimitiveNumeric(ctx, typeCode, b64.u64, byteCount);
+    PROPAGATE_ERROR(encodePrimitiveNumeric(ctx, typeCode, b64.u64, byteCount));
+    onElementAdded(ctx);
+    return KSBONJSON_ENCODE_OK;
 }
 
 ksbonjson_encodeStatus ksbonjson_addBigNumber(KSBONJSONEncodeContext* const ctx, const KSBigNumber value)
 {
     KSBONJSONContainerState* const container = getContainer(ctx);
     SHOULD_NOT_BE_EXPECTING_OBJECT_NAME_OR_CHUNKING_STRING(container);
+    SHOULD_HAVE_ELEMENTS_REMAINING(container);
 
     unlikely_if(value.exponent < -0x800000 || value.exponent > 0x7fffff)
     {
         return KSBONJSON_ENCODE_INVALID_DATA;
     }
+
+    container->isExpectingName = container->isObject; // Objects: expect next key
 
     const size_t exponentByteCount = requiredSignedIntegerBytesMin0(value.exponent);
     const size_t significandByteCount = requiredUnsignedIntegerBytesMin0(value.significand);
@@ -464,16 +580,21 @@ ksbonjson_encodeStatus ksbonjson_addBigNumber(KSBONJSONEncodeContext* const ctx,
         );
     bits[0].b[8-exponentByteCount-2] = TYPE_BIG_NUMBER;
 
-    return addEncodedBytes(ctx, bits[0].b+8-exponentByteCount-2, significandByteCount + exponentByteCount + 2);
+    PROPAGATE_ERROR(addEncodedBytes(ctx, bits[0].b+8-exponentByteCount-2, significandByteCount + exponentByteCount + 2));
+    onElementAdded(ctx);
+    return KSBONJSON_ENCODE_OK;
 }
 
 ksbonjson_encodeStatus ksbonjson_addNull(KSBONJSONEncodeContext* const ctx)
 {
     KSBONJSONContainerState* const container = getContainer(ctx);
     SHOULD_NOT_BE_EXPECTING_OBJECT_NAME_OR_CHUNKING_STRING(container);
-    container->isExpectingName = true;
+    SHOULD_HAVE_ELEMENTS_REMAINING(container);
+    container->isExpectingName = container->isObject; // Objects: expect next key
 
-    return addEncodedByte(ctx, TYPE_NULL);
+    PROPAGATE_ERROR(addEncodedByte(ctx, TYPE_NULL));
+    onElementAdded(ctx);
+    return KSBONJSON_ENCODE_OK;
 }
 
 ksbonjson_encodeStatus ksbonjson_addString(KSBONJSONEncodeContext* const ctx,
@@ -483,19 +604,40 @@ ksbonjson_encodeStatus ksbonjson_addString(KSBONJSONEncodeContext* const ctx,
     KSBONJSONContainerState* const container = getContainer(ctx);
     SHOULD_NOT_BE_NULL_OR_CHUNKING_STRING(container, value);
 
-    // String can be a name or value, so flip expectation
-    container->isExpectingName = !container->isExpectingName;
+    // In objects: string can be a key (when expecting name) or value
+    // In arrays: strings are always values
+    const bool isObjectKey = container->isObject && container->isExpectingName;
+    if(!isObjectKey)
+    {
+        SHOULD_HAVE_ELEMENTS_REMAINING(container);
+    }
+
+    // For objects, flip expectation (key -> value -> key)
+    // For arrays, leave isExpectingName alone (always false)
+    if(container->isObject)
+    {
+        container->isExpectingName = !container->isExpectingName;
+    }
 
     if(valueLength <= 15)
     {
         uint8_t buffer[16];
         buffer[0] = (uint8_t)(TYPE_STRING0 + valueLength);
         memcpy(buffer+1, (const uint8_t*)value, valueLength);
-        return addEncodedBytes(ctx, buffer, valueLength+1);
+        PROPAGATE_ERROR(addEncodedBytes(ctx, buffer, valueLength+1));
+    }
+    else
+    {
+        PROPAGATE_ERROR(encodeTypeAndLength(ctx, TYPE_STRING, valueLength, 0));
+        PROPAGATE_ERROR(addEncodedBytes(ctx, (const uint8_t*)value, valueLength));
     }
 
-    PROPAGATE_ERROR(encodeTypeAndLength(ctx, TYPE_STRING, valueLength, 0));
-    return addEncodedBytes(ctx, (const uint8_t*)value, valueLength);
+    // Only count as element if we added a value (not a key)
+    if(!isObjectKey)
+    {
+        onElementAdded(ctx);
+    }
+    return KSBONJSON_ENCODE_OK;
 }
 
 ksbonjson_encodeStatus ksbonjson_chunkString(KSBONJSONEncodeContext* const ctx,
@@ -505,6 +647,16 @@ ksbonjson_encodeStatus ksbonjson_chunkString(KSBONJSONEncodeContext* const ctx,
 {
     KSBONJSONContainerState* const container = getContainer(ctx);
     SHOULD_NOT_BE_NULL(chunk);
+
+    // In objects: string can be a key (when expecting name) or value
+    // In arrays: strings are always values
+    const bool isObjectKey = container->isObject && container->isExpectingName;
+
+    // On first chunk, check element count if this is a value (not a key)
+    if(!container->isChunkingString && !isObjectKey)
+    {
+        SHOULD_HAVE_ELEMENTS_REMAINING(container);
+    }
 
     if(container->isChunkingString)
     {
@@ -519,11 +671,22 @@ ksbonjson_encodeStatus ksbonjson_chunkString(KSBONJSONEncodeContext* const ctx,
 
     if(isLastChunk)
     {
-        // String can be a name or value, so flip expectation
-        container->isExpectingName = !container->isExpectingName;
+        // For objects, flip expectation (key -> value -> key)
+        // For arrays, leave isExpectingName alone (always false)
+        if(container->isObject)
+        {
+            container->isExpectingName = !container->isExpectingName;
+        }
     }
 
-    return addEncodedBytes(ctx, (const uint8_t*)chunk, chunkLength);
+    PROPAGATE_ERROR(addEncodedBytes(ctx, (const uint8_t*)chunk, chunkLength));
+
+    // Only count as element when completing a value (not a key)
+    if(isLastChunk && !isObjectKey)
+    {
+        onElementAdded(ctx);
+    }
+    return KSBONJSON_ENCODE_OK;
 }
 
 ksbonjson_encodeStatus ksbonjson_addBONJSONDocument(KSBONJSONEncodeContext* const ctx,
@@ -532,37 +695,61 @@ ksbonjson_encodeStatus ksbonjson_addBONJSONDocument(KSBONJSONEncodeContext* cons
 {
     KSBONJSONContainerState* const container = getContainer(ctx);
     SHOULD_NOT_BE_EXPECTING_OBJECT_NAME_OR_CHUNKING_STRING(container);
-    container->isExpectingName = true;
+    SHOULD_HAVE_ELEMENTS_REMAINING(container);
+    container->isExpectingName = container->isObject; // Objects: expect next key
 
-    return addEncodedBytes(ctx, bonjsonDocument, documentLength);
+    PROPAGATE_ERROR(addEncodedBytes(ctx, bonjsonDocument, documentLength));
+    onElementAdded(ctx);
+    return KSBONJSON_ENCODE_OK;
 }
 
-ksbonjson_encodeStatus ksbonjson_beginObject(KSBONJSONEncodeContext* const ctx)
+ksbonjson_encodeStatus ksbonjson_beginObject(KSBONJSONEncodeContext* const ctx,
+                                             const size_t pairCount,
+                                             const bool moreChunksFollow)
 {
-    return beginContainer(ctx, TYPE_OBJECT, (KSBONJSONContainerState)
-                                            {
-                                                .isObject = true,
-                                                .isExpectingName = true,
-                                            });
+    return beginContainer(ctx, TYPE_OBJECT, pairCount, moreChunksFollow,
+                          (KSBONJSONContainerState)
+                          {
+                              .isObject = true,
+                              .isExpectingName = true,
+                          });
 }
 
-ksbonjson_encodeStatus ksbonjson_beginArray(KSBONJSONEncodeContext* const ctx)
-{
-    return beginContainer(ctx, TYPE_ARRAY, (KSBONJSONContainerState){0});
-}
-
-ksbonjson_encodeStatus ksbonjson_endContainer(KSBONJSONEncodeContext* const ctx)
+ksbonjson_encodeStatus ksbonjson_continueObject(KSBONJSONEncodeContext* const ctx,
+                                                const size_t pairCount,
+                                                const bool moreChunksFollow)
 {
     KSBONJSONContainerState* const container = getContainer(ctx);
-    SHOULD_NOT_BE_EXPECTING_OBJECT_VALUE_OR_CHUNKING_STRING(container);
-
-    unlikely_if(ctx->containerDepth <= 0)
+    unlikely_if(!container->isObject)
     {
-        return KSBONJSON_ENCODE_CLOSED_TOO_MANY_CONTAINERS;
+        return KSBONJSON_ENCODE_INVALID_DATA;
     }
+    // Must be expecting a name (not in the middle of a key-value pair)
+    unlikely_if(!container->isExpectingName)
+    {
+        return KSBONJSON_ENCODE_EXPECTED_OBJECT_VALUE;
+    }
+    return continueContainer(ctx, pairCount, moreChunksFollow);
+}
 
-    ctx->containerDepth--;
-    return addEncodedByte(ctx, TYPE_END);
+ksbonjson_encodeStatus ksbonjson_beginArray(KSBONJSONEncodeContext* const ctx,
+                                            const size_t elementCount,
+                                            const bool moreChunksFollow)
+{
+    return beginContainer(ctx, TYPE_ARRAY, elementCount, moreChunksFollow,
+                          (KSBONJSONContainerState){0});
+}
+
+ksbonjson_encodeStatus ksbonjson_continueArray(KSBONJSONEncodeContext* const ctx,
+                                               const size_t elementCount,
+                                               const bool moreChunksFollow)
+{
+    KSBONJSONContainerState* const container = getContainer(ctx);
+    unlikely_if(container->isObject)
+    {
+        return KSBONJSON_ENCODE_INVALID_DATA;
+    }
+    return continueContainer(ctx, elementCount, moreChunksFollow);
 }
 
 const char* ksbonjson_describeEncodeStatus(const ksbonjson_encodeStatus status)
@@ -587,6 +774,12 @@ const char* ksbonjson_describeEncodeStatus(const ksbonjson_encodeStatus status)
             return "The object to encode contains invalid data";
         case KSBONJSON_ENCODE_TOO_BIG:
             return "Passed in data was too big or long";
+        case KSBONJSON_ENCODE_CHUNK_ELEMENT_COUNT_EXCEEDED:
+            return "More elements were added than the chunk count specified";
+        case KSBONJSON_ENCODE_NO_MORE_CHUNKS_EXPECTED:
+            return "Attempted to continue a chunk when no more chunks are expected";
+        case KSBONJSON_ENCODE_CURRENT_CHUNK_NOT_COMPLETE:
+            return "Attempted to continue a chunk before the current one is complete";
         case KSBONJSON_ENCODE_COULD_NOT_ADD_DATA:
             return "addEncodedBytes() failed to process the passed in data";
         default:

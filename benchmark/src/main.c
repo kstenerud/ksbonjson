@@ -260,19 +260,21 @@ static ksbonjson_decodeStatus onString(const char* KSBONJSON_RESTRICT value,
     CALL_ENCODER(ksbonjson_addString(getEncoderContext(userData), value, length));
 }
 
-static ksbonjson_decodeStatus onBeginObject(void* userData)
+static ksbonjson_decodeStatus onBeginObject(size_t elementCountHint, void* userData)
 {
-    CALL_ENCODER(ksbonjson_beginObject(getEncoderContext(userData)));
+    CALL_ENCODER(ksbonjson_beginObject(getEncoderContext(userData), elementCountHint, false));
 }
 
-static ksbonjson_decodeStatus onBeginArray(void* userData)
+static ksbonjson_decodeStatus onBeginArray(size_t elementCountHint, void* userData)
 {
-    CALL_ENCODER(ksbonjson_beginArray(getEncoderContext(userData)));
+    CALL_ENCODER(ksbonjson_beginArray(getEncoderContext(userData), elementCountHint, false));
 }
 
 static ksbonjson_decodeStatus onEndContainer(void* userData)
 {
-    CALL_ENCODER(ksbonjson_endContainer(getEncoderContext(userData)));
+    // Containers auto-close when all elements are added, so nothing to do here
+    MARK_UNUSED(userData);
+    return KSBONJSON_DECODE_OK;
 }
 
 static ksbonjson_decodeStatus onEndData(void* userData)
@@ -287,8 +289,8 @@ static ksbonjson_decodeStatus onSignedIntegerDoNothing(int64_t, void*) {return 0
 static ksbonjson_decodeStatus onFloatDoNothing(double, void*) {return 0;}
 static ksbonjson_decodeStatus onNullDoNothing(void*) {return 0;}
 static ksbonjson_decodeStatus onStringDoNothing(const char* KSBONJSON_RESTRICT, size_t, void* KSBONJSON_RESTRICT) {return 0;}
-static ksbonjson_decodeStatus onBeginObjectDoNothing(void*) {return 0;}
-static ksbonjson_decodeStatus onBeginArrayDoNothing(void*) {return 0;}
+static ksbonjson_decodeStatus onBeginObjectDoNothing(size_t, void*) {return 0;}
+static ksbonjson_decodeStatus onBeginArrayDoNothing(size_t, void*) {return 0;}
 static ksbonjson_decodeStatus onEndContainerDoNothing(void*) {return 0;}
 static ksbonjson_decodeStatus onEndDataDoNothing(void*) {return 0;}
 

@@ -62,19 +62,24 @@ public:
         return ksbonjson_addNull(&context);
     }
 
-    ksbonjson_encodeStatus beginObject()
+    ksbonjson_encodeStatus beginObject(size_t pairCount, bool moreChunksFollow = false)
     {
-        return ksbonjson_beginObject(&context);
+        return ksbonjson_beginObject(&context, pairCount, moreChunksFollow);
     }
 
-    ksbonjson_encodeStatus beginArray()
+    ksbonjson_encodeStatus continueObject(size_t pairCount, bool moreChunksFollow = false)
     {
-        return ksbonjson_beginArray(&context);
+        return ksbonjson_continueObject(&context, pairCount, moreChunksFollow);
     }
 
-    ksbonjson_encodeStatus endContainer()
+    ksbonjson_encodeStatus beginArray(size_t elementCount, bool moreChunksFollow = false)
     {
-        return ksbonjson_endContainer(&context);
+        return ksbonjson_beginArray(&context, elementCount, moreChunksFollow);
+    }
+
+    ksbonjson_encodeStatus continueArray(size_t elementCount, bool moreChunksFollow = false)
+    {
+        return ksbonjson_continueArray(&context, elementCount, moreChunksFollow);
     }
 
 private:

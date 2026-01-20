@@ -42,4 +42,4 @@ project_target = executable(
   c_args : build_args,
 )
 
-test('basic', project_target)
+test('basic', project_target, args: ['-v'])

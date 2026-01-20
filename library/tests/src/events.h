@@ -356,10 +356,13 @@ protected:
 class ObjectBeginEvent: public Event
 {
 public:
+    ObjectBeginEvent(size_t pairCount = 0, bool moreChunksFollow = false)
+    : pairCount(pairCount), moreChunksFollow(moreChunksFollow)
+    {}
     virtual ~ObjectBeginEvent() {}
     virtual ksbonjson_encodeStatus operator()(KSBONJSONEncodeContext* ctx) override
     {
-        return ksbonjson_beginObject(ctx);
+        return ksbonjson_beginObject(ctx, pairCount, moreChunksFollow);
     }
     virtual std::string comparator() const override
     {
@@ -367,8 +370,13 @@ public:
     }
     virtual std::string description() const override
     {
-        return "O()";
+        std::ostringstream str;
+        str << "O(" << pairCount << (moreChunksFollow ? ",+" : "") << ")";
+        return str.str();
     }
+private:
+    size_t pairCount;
+    bool moreChunksFollow;
 protected:
     virtual bool isEqual(const Event& obj) const override {
         auto v = static_cast<const ObjectBeginEvent&>(obj);
@@ -379,10 +387,13 @@ protected:
 class ArrayBeginEvent: public Event
 {
 public:
+    ArrayBeginEvent(size_t elementCount = 0, bool moreChunksFollow = false)
+    : elementCount(elementCount), moreChunksFollow(moreChunksFollow)
+    {}
     virtual ~ArrayBeginEvent() {}
     virtual ksbonjson_encodeStatus operator()(KSBONJSONEncodeContext* ctx) override
     {
-        return ksbonjson_beginArray(ctx);
+        return ksbonjson_beginArray(ctx, elementCount, moreChunksFollow);
     }
     virtual std::string comparator() const override
     {
@@ -390,8 +401,13 @@ public:
     }
     virtual std::string description() const override
     {
-        return "A()";
+        std::ostringstream str;
+        str << "A(" << elementCount << (moreChunksFollow ? ",+" : "") << ")";
+        return str.str();
     }
+private:
+    size_t elementCount;
+    bool moreChunksFollow;
 protected:
     virtual bool isEqual(const Event& obj) const override {
         auto v = static_cast<const ArrayBeginEvent&>(obj);
@@ -399,13 +415,16 @@ protected:
     }
 };
 
+// ContainerEndEvent is used for decoding only - containers close automatically
+// during encoding when element counts are exhausted
 class ContainerEndEvent: public Event
 {
 public:
     virtual ~ContainerEndEvent() {}
-    virtual ksbonjson_encodeStatus operator()(KSBONJSONEncodeContext* ctx) override
+    virtual ksbonjson_encodeStatus operator()(KSBONJSONEncodeContext* /*ctx*/) override
     {
-        return ksbonjson_endContainer(ctx);
+        // No-op for encoding - containers close automatically
+        return KSBONJSON_ENCODE_OK;
     }
     virtual std::string comparator() const override
     {
