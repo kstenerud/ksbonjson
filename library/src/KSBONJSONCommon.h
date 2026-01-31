@@ -108,88 +108,70 @@ extern "C" {
 
 // ABOUTME: Type codes for BONJSON encoding.
 // ABOUTME: Small integers 0x00-0xc8 encode values -100 to 100 (type_code - 100).
-// ABOUTME: Type codes are arranged for efficient masking: integers at 0xd0-0xdf,
-// ABOUTME: strings at 0xe0-0xf0, other types at 0xf1-0xf9.
+// ABOUTME: Type codes: 0xca-0xcf scalars, 0xd0-0xdf short strings,
+// ABOUTME: 0xe0-0xe7 integers (CPU-native sizes), 0xfc-0xff containers/delimiters.
 
 enum
 {
     // Small integers: 0x00-0xc8 encode values -100 to 100 (value = type_code - 100)
     // SMALLINT -100 = 0x00, SMALLINT 0 = 0x64, SMALLINT 100 = 0xc8
 
-    // Reserved: 0xc9-0xcf
+    // Reserved: 0xc9
     TYPE_RESERVED_C9 = 0xc9,
-    TYPE_RESERVED_CA = 0xca,
-    TYPE_RESERVED_CB = 0xcb,
-    TYPE_RESERVED_CC = 0xcc,
-    TYPE_RESERVED_CD = 0xcd,
-    TYPE_RESERVED_CE = 0xce,
-    TYPE_RESERVED_CF = 0xcf,
 
-    // Unsigned integers: 0xd0-0xd7 (1-8 bytes)
-    TYPE_UINT8  = 0xd0,
-    TYPE_UINT16 = 0xd1,
-    TYPE_UINT24 = 0xd2,
-    TYPE_UINT32 = 0xd3,
-    TYPE_UINT40 = 0xd4,
-    TYPE_UINT48 = 0xd5,
-    TYPE_UINT56 = 0xd6,
-    TYPE_UINT64 = 0xd7,
+    // Big number (zigzag LEB128 encoded): 0xca
+    TYPE_BIG_NUMBER = 0xca,
 
-    // Signed integers: 0xd8-0xdf (1-8 bytes)
-    TYPE_SINT8  = 0xd8,
-    TYPE_SINT16 = 0xd9,
-    TYPE_SINT24 = 0xda,
-    TYPE_SINT32 = 0xdb,
-    TYPE_SINT40 = 0xdc,
-    TYPE_SINT48 = 0xdd,
-    TYPE_SINT56 = 0xde,
-    TYPE_SINT64 = 0xdf,
+    // Floats: 0xcb-0xcc (CPU-native sizes only, no bfloat16)
+    TYPE_FLOAT32 = 0xcb,
+    TYPE_FLOAT64 = 0xcc,
 
-    // Short strings: 0xe0-0xef (0-15 bytes)
-    TYPE_STRING0  = 0xe0,
-    TYPE_STRING1  = 0xe1,
-    TYPE_STRING2  = 0xe2,
-    TYPE_STRING3  = 0xe3,
-    TYPE_STRING4  = 0xe4,
-    TYPE_STRING5  = 0xe5,
-    TYPE_STRING6  = 0xe6,
-    TYPE_STRING7  = 0xe7,
-    TYPE_STRING8  = 0xe8,
-    TYPE_STRING9  = 0xe9,
-    TYPE_STRING10 = 0xea,
-    TYPE_STRING11 = 0xeb,
-    TYPE_STRING12 = 0xec,
-    TYPE_STRING13 = 0xed,
-    TYPE_STRING14 = 0xee,
-    TYPE_STRING15 = 0xef,
+    // Null, Boolean: 0xcd-0xcf
+    TYPE_NULL  = 0xcd,
+    TYPE_FALSE = 0xce,
+    TYPE_TRUE  = 0xcf,
 
-    // Long string: 0xf0
-    TYPE_STRING = 0xf0,
+    // Short strings: 0xd0-0xdf (0-15 bytes)
+    TYPE_STRING0  = 0xd0,
+    TYPE_STRING1  = 0xd1,
+    TYPE_STRING2  = 0xd2,
+    TYPE_STRING3  = 0xd3,
+    TYPE_STRING4  = 0xd4,
+    TYPE_STRING5  = 0xd5,
+    TYPE_STRING6  = 0xd6,
+    TYPE_STRING7  = 0xd7,
+    TYPE_STRING8  = 0xd8,
+    TYPE_STRING9  = 0xd9,
+    TYPE_STRING10 = 0xda,
+    TYPE_STRING11 = 0xdb,
+    TYPE_STRING12 = 0xdc,
+    TYPE_STRING13 = 0xdd,
+    TYPE_STRING14 = 0xde,
+    TYPE_STRING15 = 0xdf,
 
-    // Big number: 0xf1
-    TYPE_BIG_NUMBER = 0xf1,
+    // Unsigned integers: 0xe0-0xe3 (CPU-native sizes: 1, 2, 4, 8 bytes)
+    TYPE_UINT8  = 0xe0,
+    TYPE_UINT16 = 0xe1,
+    TYPE_UINT32 = 0xe2,
+    TYPE_UINT64 = 0xe3,
 
-    // Floats: 0xf2-0xf4
-    TYPE_FLOAT16 = 0xf2,
-    TYPE_FLOAT32 = 0xf3,
-    TYPE_FLOAT64 = 0xf4,
+    // Signed integers: 0xe4-0xe7 (CPU-native sizes: 1, 2, 4, 8 bytes)
+    TYPE_SINT8  = 0xe4,
+    TYPE_SINT16 = 0xe5,
+    TYPE_SINT32 = 0xe6,
+    TYPE_SINT64 = 0xe7,
 
-    // Null, Boolean: 0xf5-0xf7
-    TYPE_NULL  = 0xf5,
-    TYPE_FALSE = 0xf6,
-    TYPE_TRUE  = 0xf7,
+    // Reserved: 0xe8-0xfb
 
-    // Containers: 0xf8-0xf9
-    TYPE_ARRAY  = 0xf8,
-    TYPE_OBJECT = 0xf9,
+    // Containers: 0xfc-0xfd (terminated by TYPE_END)
+    TYPE_ARRAY  = 0xfc,
+    TYPE_OBJECT = 0xfd,
 
-    // Reserved: 0xfa-0xff
-    TYPE_RESERVED_FA = 0xfa,
-    TYPE_RESERVED_FB = 0xfb,
-    TYPE_RESERVED_FC = 0xfc,
-    TYPE_RESERVED_FD = 0xfd,
-    TYPE_RESERVED_FE = 0xfe,
-    TYPE_RESERVED_FF = 0xff,
+    // Container end marker
+    TYPE_END = 0xfe,
+
+    // Long string delimiter (0xff + data + 0xff)
+    TYPE_STRINGL = 0xff,
 };
 
 enum

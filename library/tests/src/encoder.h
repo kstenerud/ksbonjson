@@ -22,11 +22,6 @@ public:
         return ksbonjson_endEncode(&context);
     }
 
-    ksbonjson_encodeStatus terminate()
-    {
-        return ksbonjson_terminateDocument(&context);
-    }
-
     ksbonjson_encodeStatus addValue(bool value)
     {
         return ksbonjson_addBoolean(&context, value);
@@ -62,24 +57,19 @@ public:
         return ksbonjson_addNull(&context);
     }
 
-    ksbonjson_encodeStatus beginObject(size_t pairCount, bool moreChunksFollow = false)
+    ksbonjson_encodeStatus beginObject()
     {
-        return ksbonjson_beginObject(&context, pairCount, moreChunksFollow);
+        return ksbonjson_beginObject(&context);
     }
 
-    ksbonjson_encodeStatus continueObject(size_t pairCount, bool moreChunksFollow = false)
+    ksbonjson_encodeStatus beginArray()
     {
-        return ksbonjson_continueObject(&context, pairCount, moreChunksFollow);
+        return ksbonjson_beginArray(&context);
     }
 
-    ksbonjson_encodeStatus beginArray(size_t elementCount, bool moreChunksFollow = false)
+    ksbonjson_encodeStatus endContainer()
     {
-        return ksbonjson_beginArray(&context, elementCount, moreChunksFollow);
-    }
-
-    ksbonjson_encodeStatus continueArray(size_t elementCount, bool moreChunksFollow = false)
-    {
-        return ksbonjson_continueArray(&context, elementCount, moreChunksFollow);
+        return ksbonjson_endContainer(&context);
     }
 
 private:

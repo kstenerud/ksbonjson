@@ -6,12 +6,6 @@
 #include <vector>
 #include <sstream>
 
-typedef enum
-{
-    CHUNK_HAS_NEXT,
-    CHUNK_LAST
-} CHUNK_MODE;
-
 class Event
 {
 public:
@@ -26,15 +20,14 @@ protected:
 
 bool operator==(const Event& lhs, const Event& rhs) {
     return lhs.comparator() == rhs.comparator();
-    //return typeid(lhs) == typeid(rhs) && lhs.isEqual(rhs);
 }
 bool operator!=(const Event& lhs, const Event& rhs) {
     return !(lhs == rhs);
 }
-std::ostream &operator<<(std::ostream &os, Event const &e) { 
+std::ostream &operator<<(std::ostream &os, Event const &e) {
     return os << e.description();
 }
-std::ostream &operator<<(std::ostream &os, std::vector<std::shared_ptr<Event>> &v) { 
+std::ostream &operator<<(std::ostream &os, std::vector<std::shared_ptr<Event>> &v) {
     os << "[";
     for(std::shared_ptr<Event> &e: v)
     {
@@ -276,48 +269,6 @@ protected:
     }
 };
 
-class StringChunkEvent: public Event
-{
-public:
-    StringChunkEvent(std::string value, CHUNK_MODE chunkMode)
-    : value(value)
-    , chunkMode(chunkMode)
-    {}
-    StringChunkEvent(const char* value, CHUNK_MODE chunkMode)
-    : value(value)
-    , chunkMode(chunkMode)
-    {}
-    StringChunkEvent(const char* value, size_t length, CHUNK_MODE chunkMode)
-    : value(value, length)
-    , chunkMode(chunkMode)
-    {}
-    virtual ~StringChunkEvent() {}
-    virtual ksbonjson_encodeStatus operator()(KSBONJSONEncodeContext* ctx) override
-    {
-        return ksbonjson_chunkString(ctx, value.c_str(), value.length(), chunkMode == CHUNK_LAST);
-    }
-    virtual std::string comparator() const override
-    {
-        std::ostringstream str;
-        str << "'" << value << "'";
-        return str.str();
-    }
-    virtual std::string description() const override
-    {
-        std::ostringstream str;
-        str << "C(" << value << ")";
-        return str.str();
-    }
-private:
-    std::string value;
-    CHUNK_MODE chunkMode;
-protected:
-    virtual bool isEqual(const Event& obj) const override {
-        auto v = static_cast<const StringChunkEvent&>(obj);
-        return Event::isEqual(v) && (v.value == value) && (v.chunkMode = chunkMode);
-    }
-};
-
 class BONJSONDocumentEvent: public Event
 {
 public:
@@ -356,13 +307,12 @@ protected:
 class ObjectBeginEvent: public Event
 {
 public:
-    ObjectBeginEvent(size_t pairCount = 0, bool moreChunksFollow = false)
-    : pairCount(pairCount), moreChunksFollow(moreChunksFollow)
+    ObjectBeginEvent()
     {}
     virtual ~ObjectBeginEvent() {}
     virtual ksbonjson_encodeStatus operator()(KSBONJSONEncodeContext* ctx) override
     {
-        return ksbonjson_beginObject(ctx, pairCount, moreChunksFollow);
+        return ksbonjson_beginObject(ctx);
     }
     virtual std::string comparator() const override
     {
@@ -370,13 +320,8 @@ public:
     }
     virtual std::string description() const override
     {
-        std::ostringstream str;
-        str << "O(" << pairCount << (moreChunksFollow ? ",+" : "") << ")";
-        return str.str();
+        return "O()";
     }
-private:
-    size_t pairCount;
-    bool moreChunksFollow;
 protected:
     virtual bool isEqual(const Event& obj) const override {
         auto v = static_cast<const ObjectBeginEvent&>(obj);
@@ -387,13 +332,12 @@ protected:
 class ArrayBeginEvent: public Event
 {
 public:
-    ArrayBeginEvent(size_t elementCount = 0, bool moreChunksFollow = false)
-    : elementCount(elementCount), moreChunksFollow(moreChunksFollow)
+    ArrayBeginEvent()
     {}
     virtual ~ArrayBeginEvent() {}
     virtual ksbonjson_encodeStatus operator()(KSBONJSONEncodeContext* ctx) override
     {
-        return ksbonjson_beginArray(ctx, elementCount, moreChunksFollow);
+        return ksbonjson_beginArray(ctx);
     }
     virtual std::string comparator() const override
     {
@@ -401,13 +345,8 @@ public:
     }
     virtual std::string description() const override
     {
-        std::ostringstream str;
-        str << "A(" << elementCount << (moreChunksFollow ? ",+" : "") << ")";
-        return str.str();
+        return "A()";
     }
-private:
-    size_t elementCount;
-    bool moreChunksFollow;
 protected:
     virtual bool isEqual(const Event& obj) const override {
         auto v = static_cast<const ArrayBeginEvent&>(obj);
@@ -415,16 +354,13 @@ protected:
     }
 };
 
-// ContainerEndEvent is used for decoding only - containers close automatically
-// during encoding when element counts are exhausted
 class ContainerEndEvent: public Event
 {
 public:
     virtual ~ContainerEndEvent() {}
-    virtual ksbonjson_encodeStatus operator()(KSBONJSONEncodeContext* /*ctx*/) override
+    virtual ksbonjson_encodeStatus operator()(KSBONJSONEncodeContext* ctx) override
     {
-        // No-op for encoding - containers close automatically
-        return KSBONJSON_ENCODE_OK;
+        return ksbonjson_endContainer(ctx);
     }
     virtual std::string comparator() const override
     {

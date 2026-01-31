@@ -115,61 +115,36 @@ typedef enum
      * Everything completed without error
      */
     KSBONJSON_ENCODE_OK = 0,
-    
+
     /**
      * Expected an object element name, but got a non-string.
      */
     KSBONJSON_ENCODE_EXPECTED_OBJECT_NAME = 1,
-    
+
     /**
      * Attempted to close an object while it's expecting a value for the current name.
      */
     KSBONJSON_ENCODE_EXPECTED_OBJECT_VALUE = 2,
 
     /**
-     * Attempted to add a discrete value while chunking a string.
-     */
-    KSBONJSON_ENCODE_CHUNKING_STRING = 3,
-    
-    /**
      * Passed in a NULL pointer.
      */
-    KSBONJSON_ENCODE_NULL_POINTER = 4,
-    
+    KSBONJSON_ENCODE_NULL_POINTER = 3,
+
     /**
      * Attempted to close more containers than there actually are.
      */
-    KSBONJSON_ENCODE_CLOSED_TOO_MANY_CONTAINERS = 5,
+    KSBONJSON_ENCODE_CLOSED_TOO_MANY_CONTAINERS = 4,
 
     /**
      * Attempted to end the encoding while there are still containers open.
      */
-    KSBONJSON_ENCODE_CONTAINERS_ARE_STILL_OPEN = 6,
+    KSBONJSON_ENCODE_CONTAINERS_ARE_STILL_OPEN = 5,
 
     /**
      * The object to encode contains invalid data.
      */
-    KSBONJSON_ENCODE_INVALID_DATA = 7,
-
-    /**
-     * Passed in data was too big or long.
-     */
-    KSBONJSON_ENCODE_TOO_BIG = 8,
-
-    /**
-     * More elements were added than the chunk count specified.
-     */
-    KSBONJSON_ENCODE_CHUNK_ELEMENT_COUNT_EXCEEDED = 9,
-
-    /**
-     * Attempted to continue a chunk when no more chunks are expected.
-     */
-    KSBONJSON_ENCODE_NO_MORE_CHUNKS_EXPECTED = 10,
-
-    /**
-     * Attempted to continue a chunk before the current one is complete.
-     */
-    KSBONJSON_ENCODE_CURRENT_CHUNK_NOT_COMPLETE = 11,
+    KSBONJSON_ENCODE_INVALID_DATA = 6,
 
     /**
      * Generic error code that can be returned from addEncodedData().
@@ -191,17 +166,14 @@ typedef ksbonjson_encodeStatus (*KSBONJSONAddEncodedDataFunc)(const uint8_t* KSB
                                                               size_t dataLength,
                                                               void* KSBONJSON_RESTRICT userData);
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpadded"
 typedef struct
 {
-    uint64_t elementsRemaining;  // Elements/pairs remaining in current chunk
     uint8_t isObject: 1;
     uint8_t isExpectingName: 1;
-    uint8_t isChunkingString: 1;
-    uint8_t moreChunksFollow: 1;
 } KSBONJSONContainerState;
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpadded"
 typedef struct
 {
     KSBONJSONAddEncodedDataFunc addEncodedData;
@@ -230,24 +202,16 @@ KSBONJSON_PUBLIC void ksbonjson_beginEncode(KSBONJSONEncodeContext* context,
 /**
  * End the encoding process.
  *
- * @return KSBONJSON_ENCODER_OK if the process was successful.
+ * @return KSBONJSON_ENCODE_OK if the process was successful.
  */
 KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_endEncode(KSBONJSONEncodeContext* context);
-
-/**
- * End all open containers in the document, leaving it in a balanced state ready for ksbonjson_endEncode().
- *
- * @param context The encoding context.
- * @return KSBONJSON_ENCODER_OK if the process was successful.
- */
-KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_terminateDocument(KSBONJSONEncodeContext* context);
 
 /**
  * Add a boolean element.
  *
  * @param context The encoding context.
  * @param value The element's value.
- * @return KSBONJSON_ENCODER_OK if the process was successful.
+ * @return KSBONJSON_ENCODE_OK if the process was successful.
  */
 KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addBoolean(KSBONJSONEncodeContext* context, bool value);
 
@@ -256,7 +220,7 @@ KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addBoolean(KSBONJSONEncodeCont
  *
  * @param context The encoding context.
  * @param value The element's value.
- * @return KSBONJSON_ENCODER_OK if the process was successful.
+ * @return KSBONJSON_ENCODE_OK if the process was successful.
  */
 KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addUnsignedInteger(KSBONJSONEncodeContext* context, uint64_t value);
 
@@ -265,7 +229,7 @@ KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addUnsignedInteger(KSBONJSONEn
  *
  * @param context The encoding context.
  * @param value The element's value.
- * @return KSBONJSON_ENCODER_OK if the process was successful.
+ * @return KSBONJSON_ENCODE_OK if the process was successful.
  */
 KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addSignedInteger(KSBONJSONEncodeContext* context, int64_t value);
 
@@ -274,7 +238,7 @@ KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addSignedInteger(KSBONJSONEnco
  *
  * @param context The encoding context.
  * @param value The element's value.
- * @return KSBONJSON_ENCODER_OK if the process was successful.
+ * @return KSBONJSON_ENCODE_OK if the process was successful.
  */
 KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addFloat(KSBONJSONEncodeContext* context, double value);
 
@@ -283,7 +247,7 @@ KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addFloat(KSBONJSONEncodeContex
  *
  * @param context The encoding context.
  * @param value The element's value.
- * @return KSBONJSON_ENCODER_OK if the process was successful.
+ * @return KSBONJSON_ENCODE_OK if the process was successful.
  */
 KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addBigNumber(KSBONJSONEncodeContext* context, KSBigNumber value);
 
@@ -291,7 +255,7 @@ KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addBigNumber(KSBONJSONEncodeCo
  * Add a null element.
  *
  * @param context The encoding context.
- * @return KSBONJSON_ENCODER_OK if the process was successful.
+ * @return KSBONJSON_ENCODE_OK if the process was successful.
  */
 KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addNull(KSBONJSONEncodeContext* context);
 
@@ -303,106 +267,52 @@ KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addNull(KSBONJSONEncodeContext
  * @param context The encoding context.
  * @param value The element's value. This MUST be a complete and valid UTF-8 string!
  * @param valueLength the length of the string.
- * @return KSBONJSON_ENCODER_OK if the process was successful.
+ * @return KSBONJSON_ENCODE_OK if the process was successful.
  */
 KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addString(KSBONJSONEncodeContext* KSBONJSON_RESTRICT context,
                                                             const char* KSBONJSON_RESTRICT value,
                                                             size_t valueLength);
-
-/**
- * Build a string element progressively in chunks. When isLastChunk is true, the string is considered complete.
- *
- * Note: This library doesn't do UTF-8 checking!
- *
- * @param context The encoding context.
- * @param chunk The string chunk. This MUST be a complete and valid UTF-8 string!
- * @param chunkLength the length of the string chunk.
- * @param isLastChunk set to true if this chunk also marks the end of the string element.
- * @return KSBONJSON_ENCODER_OK if the process was successful.
- */
-KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_chunkString(KSBONJSONEncodeContext* KSBONJSON_RESTRICT context,
-                                                              const char* KSBONJSON_RESTRICT chunk,
-                                                              size_t chunkLength,
-                                                              bool isLastChunk);
 
 /** Add an already encoded BONJSON document as an element.
  *
  * @param context The encoding context.
  * @param bonjsonDocument A valid, encoded BONJSON document.
  * @param documentLength The length of the BONJSON document.
- * @return KSBONJSON_ENCODER_OK if the process was successful.
+ * @return KSBONJSON_ENCODE_OK if the process was successful.
  */
 KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_addBONJSONDocument(KSBONJSONEncodeContext* KSBONJSON_RESTRICT context,
                                                                      const uint8_t* KSBONJSON_RESTRICT bonjsonDocument,
                                                                      size_t documentLength);
 
 /**
- * Begin a new object container with a chunk.
+ * Begin a new object container.
  *
- * Objects use chunked encoding: each chunk specifies how many key-value pairs follow.
- * For single-chunk objects (most common), pass moreChunksFollow=false.
- * For multi-chunk objects, pass moreChunksFollow=true and call ksbonjson_continueObject
- * after adding pairCount pairs.
- *
- * The container closes automatically when the final chunk's pairs are added.
+ * Objects are terminated by calling ksbonjson_endContainer().
  *
  * @param context The encoding context.
- * @param pairCount Number of key-value pairs in this chunk.
- * @param moreChunksFollow True if more chunks will follow this one.
  * @return KSBONJSON_ENCODE_OK if the process was successful.
  */
-KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_beginObject(KSBONJSONEncodeContext* context,
-                                                               size_t pairCount,
-                                                               bool moreChunksFollow);
+KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_beginObject(KSBONJSONEncodeContext* context);
 
 /**
- * Continue an object with another chunk.
+ * Begin a new array container.
  *
- * Must be called after the previous chunk's pairs have been added, and only
- * if the previous chunk had moreChunksFollow=true.
+ * Arrays are terminated by calling ksbonjson_endContainer().
  *
  * @param context The encoding context.
- * @param pairCount Number of key-value pairs in this chunk.
- * @param moreChunksFollow True if more chunks will follow this one.
  * @return KSBONJSON_ENCODE_OK if the process was successful.
  */
-KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_continueObject(KSBONJSONEncodeContext* context,
-                                                                  size_t pairCount,
-                                                                  bool moreChunksFollow);
+KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_beginArray(KSBONJSONEncodeContext* context);
 
 /**
- * Begin a new array container with a chunk.
+ * End the current container (array or object).
  *
- * Arrays use chunked encoding: each chunk specifies how many elements follow.
- * For single-chunk arrays (most common), pass moreChunksFollow=false.
- * For multi-chunk arrays, pass moreChunksFollow=true and call ksbonjson_continueArray
- * after adding elementCount elements.
- *
- * The container closes automatically when the final chunk's elements are added.
+ * Emits the TYPE_END marker (0xFE) to close the container.
  *
  * @param context The encoding context.
- * @param elementCount Number of elements in this chunk.
- * @param moreChunksFollow True if more chunks will follow this one.
  * @return KSBONJSON_ENCODE_OK if the process was successful.
  */
-KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_beginArray(KSBONJSONEncodeContext* context,
-                                                              size_t elementCount,
-                                                              bool moreChunksFollow);
-
-/**
- * Continue an array with another chunk.
- *
- * Must be called after the previous chunk's elements have been added, and only
- * if the previous chunk had moreChunksFollow=true.
- *
- * @param context The encoding context.
- * @param elementCount Number of elements in this chunk.
- * @param moreChunksFollow True if more chunks will follow this one.
- * @return KSBONJSON_ENCODE_OK if the process was successful.
- */
-KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_continueArray(KSBONJSONEncodeContext* context,
-                                                                 size_t elementCount,
-                                                                 bool moreChunksFollow);
+KSBONJSON_PUBLIC ksbonjson_encodeStatus ksbonjson_endContainer(KSBONJSONEncodeContext* context);
 
 /**
  * Get a description for an encoding status code.

@@ -261,53 +261,20 @@ typedef struct KSBONJSONDecodeCallbacks
                                        void* KSBONJSON_RESTRICT userData);
 
     /**
-     * Called when a string chunk is decoded.
-     *
-     * The BONSJON spec requires at least one chunking security policy.
-     * As this library is a low-level building block, it's on the user of this library
-     * to add such a policy.
-     *
-     * The string data has NOT been validated against UTF-8!
-     *
-     * Even after validation, the string data could in theory contain NUL
-     * characters (which are valid in JSON).
-     *
-     * @param value The chunk's value.
-     * @param length The chunk's length in bytes.
-     * @param isLastChunk If true, this is the last chunk, and the string is done.
-     * @param userData Data that was specified when calling ksbonjson_decode().
-     * @return KSBONJSON_DECODE_OK if decoding should continue.
-     */
-    ksbonjson_decodeStatus (*onStringChunk)(const char* KSBONJSON_RESTRICT value,
-        size_t length,
-        bool isLastChunk,
-        void* KSBONJSON_RESTRICT userData);
-
-    /**
      * Called when a new object is encountered.
      *
-     * The elementCountHint provides the number of key-value pairs in the first chunk.
-     * This can be used as a hint for pre-allocation. For single-chunk objects (most common),
-     * this is the total pair count. For multi-chunk objects, additional pairs may follow.
-     *
-     * @param elementCountHint Number of key-value pairs in the first chunk (pre-allocation hint).
      * @param userData Data that was specified when calling ksbonjson_decode().
      * @return KSBONJSON_DECODE_OK if decoding should continue.
      */
-    ksbonjson_decodeStatus (*onBeginObject)(size_t elementCountHint, void* userData);
+    ksbonjson_decodeStatus (*onBeginObject)(void* userData);
 
     /**
      * Called when a new array is encountered.
      *
-     * The elementCountHint provides the number of elements in the first chunk.
-     * This can be used as a hint for pre-allocation. For single-chunk arrays (most common),
-     * this is the total element count. For multi-chunk arrays, additional elements may follow.
-     *
-     * @param elementCountHint Number of elements in the first chunk (pre-allocation hint).
      * @param userData Data that was specified when calling ksbonjson_decode().
      * @return KSBONJSON_DECODE_OK if decoding should continue.
      */
-    ksbonjson_decodeStatus (*onBeginArray)(size_t elementCountHint, void* userData);
+    ksbonjson_decodeStatus (*onBeginArray)(void* userData);
 
     /**
      * Called when leaving the current container and returning to the next

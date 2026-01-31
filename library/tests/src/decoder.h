@@ -32,10 +32,9 @@ protected:
     virtual ksbonjson_decodeStatus onValue(double value) = 0;
     virtual ksbonjson_decodeStatus onValue(KSBigNumber value) = 0;
     virtual ksbonjson_decodeStatus onString(const char* value, size_t length) = 0;
-    virtual ksbonjson_decodeStatus onStringChunk(const char* value, size_t length, bool isLastChunk) = 0;
     virtual ksbonjson_decodeStatus onNull() = 0;
-    virtual ksbonjson_decodeStatus onBeginObject(size_t elementCountHint) = 0;
-    virtual ksbonjson_decodeStatus onBeginArray(size_t elementCountHint) = 0;
+    virtual ksbonjson_decodeStatus onBeginObject() = 0;
+    virtual ksbonjson_decodeStatus onBeginArray() = 0;
     virtual ksbonjson_decodeStatus onEndContainer() = 0;
     virtual ksbonjson_decodeStatus onEndData() = 0;
 
@@ -50,13 +49,9 @@ private:
     friend ksbonjson_decodeStatus onString(const char* KSBONJSON_RESTRICT value,
                                            size_t length,
                                            void* KSBONJSON_RESTRICT userData);
-    friend ksbonjson_decodeStatus onStringChunk(const char* KSBONJSON_RESTRICT value,
-                                                size_t length,
-                                                bool isLastChunk,
-                                                void* KSBONJSON_RESTRICT userData);
     friend ksbonjson_decodeStatus onNull(void* userData);
-    friend ksbonjson_decodeStatus onBeginObject(size_t elementCountHint, void* userData);
-    friend ksbonjson_decodeStatus onBeginArray(size_t elementCountHint, void* userData);
+    friend ksbonjson_decodeStatus onBeginObject(void* userData);
+    friend ksbonjson_decodeStatus onBeginArray(void* userData);
     friend ksbonjson_decodeStatus onEndContainer(void* userData);
     friend ksbonjson_decodeStatus onEndData(void* userData);
 };
@@ -91,20 +86,13 @@ ksbonjson_decodeStatus onString(const char* KSBONJSON_RESTRICT value,
 {
     return ((Decoder*)userData)->onString(value, length);
 }
-ksbonjson_decodeStatus onStringChunk(const char* KSBONJSON_RESTRICT value,
-    size_t length,
-    bool isLastChunk,
-    void* KSBONJSON_RESTRICT userData)
+ksbonjson_decodeStatus onBeginObject(void* userData)
 {
-    return ((Decoder*)userData)->onStringChunk(value, length, isLastChunk);
+    return ((Decoder*)userData)->onBeginObject();
 }
-ksbonjson_decodeStatus onBeginObject(size_t elementCountHint, void* userData)
+ksbonjson_decodeStatus onBeginArray(void* userData)
 {
-    return ((Decoder*)userData)->onBeginObject(elementCountHint);
-}
-ksbonjson_decodeStatus onBeginArray(size_t elementCountHint, void* userData)
-{
-    return ((Decoder*)userData)->onBeginArray(elementCountHint);
+    return ((Decoder*)userData)->onBeginArray();
 }
 ksbonjson_decodeStatus onEndContainer(void* userData)
 {
@@ -124,7 +112,6 @@ Decoder::Decoder()
     .onBigNumber = ksbonjson::onValue,
     .onNull = ksbonjson::onNull,
     .onString = ksbonjson::onString,
-    .onStringChunk = ksbonjson::onStringChunk,
     .onBeginObject = ksbonjson::onBeginObject,
     .onBeginArray = ksbonjson::onBeginArray,
     .onEndContainer = ksbonjson::onEndContainer,
