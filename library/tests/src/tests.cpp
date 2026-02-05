@@ -639,58 +639,140 @@ TEST(EncodeDecode, long_string)
 
 // ------------------------------------
 // Big Number Tests
+// New format: 0xCA [exponent zigzag LEB128] [signed_length zigzag LEB128] [magnitude LE bytes]
+// signed_length: abs = byte count of magnitude, sign = sign of significand, 0 = zero significand
 // ------------------------------------
 
 TEST(EncodeDecode, big_number_zero)
 {
-    // BigNumber(+, 0, exp=0): 0xCA + zigzag_leb128(0) + zigzag_leb128(0) = CA 00 00
+    // BigNumber(+, 0, exp=0): CA + zigzag(0) + zigzag(0) = CA 00 00
+    // signed_length=0 means zero significand, no magnitude bytes
     assert_encode_decode(
         {std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(1, 0, 0))},
         {TYPE_BIG_NUMBER, 0x00, 0x00}
     );
 }
 
-TEST(EncodeDecode, big_number_positive)
+TEST(EncodeDecode, big_number_positive_1byte)
 {
-    // BigNumber(+, 123, exp=0): 0xCA + zigzag_leb128(0) + zigzag_leb128(123)
-    // zigzag(0) = 0 -> LEB128 = 0x00
-    // zigzag(123) = 246 -> LEB128 = 0xf6, 0x01
+    // BigNumber(+, 2, exp=0): CA + zigzag(0) + zigzag(+1) + 0x02
+    // exponent=0 -> zigzag=0x00
+    // signed_length=+1 (1 byte, positive) -> zigzag(1)=2 -> 0x02
+    // magnitude=0x02
     assert_encode_decode(
-        {std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(1, 123, 0))},
-        {TYPE_BIG_NUMBER, 0x00, 0xf6, 0x01}
+        {std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(1, 2, 0))},
+        {TYPE_BIG_NUMBER, 0x00, 0x02, 0x02}
     );
 }
 
-TEST(EncodeDecode, big_number_negative)
+TEST(EncodeDecode, big_number_negative_1byte)
 {
-    // BigNumber(-, 123, exp=0): 0xCA + zigzag_leb128(0) + zigzag_leb128(-123)
-    // zigzag(-123) = 245 -> LEB128 = 0xf5, 0x01
+    // BigNumber(-, 1, exp=0): CA + zigzag(0) + zigzag(-1) + 0x01
+    // signed_length=-1 (1 byte, negative) -> zigzag(-1)=1 -> 0x01
+    // magnitude=0x01
+    assert_encode_decode(
+        {std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 1, 0))},
+        {TYPE_BIG_NUMBER, 0x00, 0x01, 0x01}
+    );
+}
+
+TEST(EncodeDecode, big_number_positive_123)
+{
+    // BigNumber(+, 123, exp=0): CA + zigzag(0) + zigzag(+1) + 0x7B
+    // 123 = 0x7B fits in 1 byte
+    // signed_length=+1 -> zigzag(1)=2 -> 0x02
+    assert_encode_decode(
+        {std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(1, 123, 0))},
+        {TYPE_BIG_NUMBER, 0x00, 0x02, 0x7b}
+    );
+}
+
+TEST(EncodeDecode, big_number_negative_123)
+{
+    // BigNumber(-, 123, exp=0): CA + zigzag(0) + zigzag(-1) + 0x7B
+    // signed_length=-1 -> zigzag(-1)=1 -> 0x01
     assert_encode_decode(
         {std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(-1, 123, 0))},
-        {TYPE_BIG_NUMBER, 0x00, 0xf5, 0x01}
+        {TYPE_BIG_NUMBER, 0x00, 0x01, 0x7b}
     );
 }
 
 TEST(EncodeDecode, big_number_with_exponent)
 {
-    // BigNumber(+, 1, exp=5): 0xCA + zigzag_leb128(5) + zigzag_leb128(1)
-    // zigzag(5) = 10 -> LEB128 = 0x0a
-    // zigzag(1) = 2 -> LEB128 = 0x02
+    // BigNumber(+, 1, exp=5): CA + zigzag(5) + zigzag(+1) + 0x01
+    // zigzag(5)=10 -> 0x0a
+    // signed_length=+1 -> zigzag(1)=2 -> 0x02
     assert_encode_decode(
         {std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(1, 1, 5))},
-        {TYPE_BIG_NUMBER, 0x0a, 0x02}
+        {TYPE_BIG_NUMBER, 0x0a, 0x02, 0x01}
     );
 }
 
 TEST(EncodeDecode, big_number_negative_exponent)
 {
-    // BigNumber(+, 1, exp=-3): 0xCA + zigzag_leb128(-3) + zigzag_leb128(1)
-    // zigzag(-3) = 5 -> LEB128 = 0x05
-    // zigzag(1) = 2 -> LEB128 = 0x02
+    // BigNumber(+, 1, exp=-3): CA + zigzag(-3) + zigzag(+1) + 0x01
+    // zigzag(-3)=5 -> 0x05
     assert_encode_decode(
         {std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(1, 1, -3))},
-        {TYPE_BIG_NUMBER, 0x05, 0x02}
+        {TYPE_BIG_NUMBER, 0x05, 0x02, 0x01}
     );
+}
+
+TEST(EncodeDecode, big_number_spec_example_1_5)
+{
+    // Spec example: 1.5 = 15 × 10^-1
+    // CA + zigzag(-1)=0x01 + zigzag(+1)=0x02 + 0x0F
+    assert_encode_decode(
+        {std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(1, 15, -1))},
+        {TYPE_BIG_NUMBER, 0x01, 0x02, 0x0f}
+    );
+}
+
+TEST(EncodeDecode, big_number_spec_example_1000)
+{
+    // Spec example: 1000 = 10 × 10^2
+    // CA + zigzag(2)=0x04 + zigzag(+1)=0x02 + 0x0A
+    assert_encode_decode(
+        {std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(1, 10, 2))},
+        {TYPE_BIG_NUMBER, 0x04, 0x02, 0x0a}
+    );
+}
+
+TEST(EncodeDecode, big_number_2byte_magnitude)
+{
+    // BigNumber(+, 256, exp=0): magnitude=0x100 needs 2 bytes LE: 0x00, 0x01
+    // signed_length=+2 -> zigzag(2)=4 -> 0x04
+    assert_encode_decode(
+        {std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(1, 256, 0))},
+        {TYPE_BIG_NUMBER, 0x00, 0x04, 0x00, 0x01}
+    );
+}
+
+TEST(EncodeDecode, big_number_8byte_magnitude)
+{
+    // BigNumber(+, 0x0100000000000000, exp=0): needs 8 bytes
+    // signed_length=+8 -> zigzag(8)=16 -> 0x10
+    assert_encode_decode(
+        {std::make_shared<BigNumberEvent>(ksbonjson_newBigNumber(1, 0x0100000000000000ULL, 0))},
+        {TYPE_BIG_NUMBER, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}
+    );
+}
+
+TEST(DecodeError, big_number_non_normalized_magnitude)
+{
+    // Non-normalized magnitude: 2 bytes but last byte is 0x00
+    // CA + zigzag(0)=0x00 + zigzag(+2)=0x04 + [0x01, 0x00]
+    // The most significant byte (last) is 0x00, which is invalid
+    assert_decode_result(KSBONJSON_DECODE_INVALID_DATA,
+        {TYPE_BIG_NUMBER, 0x00, 0x04, 0x01, 0x00});
+}
+
+TEST(DecodeError, big_number_magnitude_too_large)
+{
+    // signed_length=+9 -> zigzag(9)=18 -> 0x12
+    // 9 bytes exceeds uint64_t capacity
+    assert_decode_result(KSBONJSON_DECODE_VALUE_OUT_OF_RANGE,
+        {TYPE_BIG_NUMBER, 0x00, 0x12, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09});
 }
 
 // ------------------------------------

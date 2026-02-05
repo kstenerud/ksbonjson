@@ -119,7 +119,7 @@ enum
     // Reserved: 0xc9
     TYPE_RESERVED_C9 = 0xc9,
 
-    // Big number (zigzag LEB128 encoded): 0xca
+    // Big number (zigzag LEB128 metadata + LE magnitude): 0xca
     TYPE_BIG_NUMBER = 0xca,
 
     // Floats: 0xcb-0xcc (CPU-native sizes only, no bfloat16)

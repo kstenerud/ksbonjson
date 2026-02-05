@@ -235,59 +235,53 @@ static ksbonjson_decodeStatus decodeZigzagLEB128(DecodeContext* const ctx, int64
     return KSBONJSON_DECODE_OK;
 }
 
-/**
- * Decode a zigzag LEB128 value into a sign + absolute significand.
- * Handles values that exceed INT64_MAX when represented as unsigned.
- */
-static ksbonjson_decodeStatus decodeSignedZigzagLEB128(DecodeContext* const ctx,
-                                                        int32_t* sign,
-                                                        uint64_t* significand)
-{
-    uint64_t zigzag = 0;
-    unsigned shift = 0;
-
-    for(;;)
-    {
-        SHOULD_HAVE_ROOM_FOR_BYTES(1);
-        const uint8_t byte = *ctx->bufferCurrent++;
-        zigzag |= ((uint64_t)(byte & 0x7f)) << shift;
-        if(!(byte & 0x80))
-        {
-            break;
-        }
-        shift += 7;
-        unlikely_if(shift >= 70)
-        {
-            return KSBONJSON_DECODE_VALUE_OUT_OF_RANGE;
-        }
-    }
-
-    // Zigzag decode
-    if(zigzag & 1)
-    {
-        // Negative value
-        *sign = -1;
-        *significand = (zigzag >> 1) + 1;
-    }
-    else
-    {
-        // Positive value (or zero)
-        *sign = 1;
-        *significand = zigzag >> 1;
-    }
-    return KSBONJSON_DECODE_OK;
-}
-
 static ksbonjson_decodeStatus decodeAndReportBigNumber(DecodeContext* const ctx)
 {
     // Decode exponent (zigzag LEB128)
     int64_t exponent;
     PROPAGATE_ERROR(ctx, decodeZigzagLEB128(ctx, &exponent));
 
-    // Decode significand (zigzag LEB128 with sign)
+    // Decode signed_length (zigzag LEB128)
+    int64_t signedLength;
+    PROPAGATE_ERROR(ctx, decodeZigzagLEB128(ctx, &signedLength));
+
     int32_t sign;
     uint64_t significand;
-    PROPAGATE_ERROR(ctx, decodeSignedZigzagLEB128(ctx, &sign, &significand));
+
+    if(signedLength == 0)
+    {
+        // Zero significand
+        sign = 1;
+        significand = 0;
+    }
+    else
+    {
+        // Extract sign and byte count
+        sign = (signedLength > 0) ? 1 : -1;
+        const int64_t byteCount = (signedLength > 0) ? signedLength : -signedLength;
+
+        // Validate byte count fits in uint64_t
+        unlikely_if(byteCount > 8)
+        {
+            return KSBONJSON_DECODE_VALUE_OUT_OF_RANGE;
+        }
+
+        SHOULD_HAVE_ROOM_FOR_BYTES((size_t)byteCount);
+
+        // Validate normalization: last byte (most significant) must be non-zero
+        unlikely_if(ctx->bufferCurrent[byteCount - 1] == 0)
+        {
+            return KSBONJSON_DECODE_INVALID_DATA;
+        }
+
+        // Read magnitude as LE unsigned integer
+        union number_bits bits = {.u64 = 0};
+        memcpy(bits.b, ctx->bufferCurrent, (size_t)byteCount);
+        bits.u64 = fromLittleEndian(bits.u64);
+        ctx->bufferCurrent += byteCount;
+
+        significand = bits.u64;
+    }
 
     return ctx->callbacks->onBigNumber(ksbonjson_newBigNumber(sign, significand, (int32_t)exponent), ctx->userData);
 }

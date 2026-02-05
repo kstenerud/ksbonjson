@@ -255,59 +255,6 @@ static ksbonjson_encodeStatus encodeZigzagLEB128(KSBONJSONEncodeContext* const c
     return addEncodedBytes(ctx, buffer, count);
 }
 
-/**
- * Encode a uint64 value using zigzag LEB128. The value is treated as the
- * absolute value of the significand; the sign is incorporated by the caller
- * by passing a negative value when the significand is negative.
- */
-static ksbonjson_encodeStatus encodeSignedZigzagLEB128(KSBONJSONEncodeContext* const ctx,
-                                                        int significandSign,
-                                                        uint64_t significand)
-{
-    // We need to convert (sign, abs_significand) to a signed int64 for zigzag.
-    // If significand > INT64_MAX, we can't represent it as int64. However,
-    // the only value that overflows is UINT64_MAX with negative sign, which
-    // would be -UINT64_MAX. Zigzag of that would be UINT64_MAX*2+1 which
-    // also doesn't fit. For values that fit in int64:
-    if(significand > (uint64_t)INT64_MAX)
-    {
-        // significand doesn't fit in int64. Encode manually.
-        // zigzag = significandSign < 0 ? significand*2 - 1 : significand*2
-        // But significand*2 might overflow. Handle carefully.
-        uint64_t zigzag;
-        if(significandSign < 0)
-        {
-            zigzag = significand * 2 - 1;
-        }
-        else
-        {
-            zigzag = significand * 2;
-        }
-
-        uint8_t buffer[10];
-        size_t count = 0;
-        do
-        {
-            uint8_t byte = (uint8_t)(zigzag & 0x7f);
-            zigzag >>= 7;
-            if(zigzag != 0)
-            {
-                byte |= 0x80;
-            }
-            buffer[count++] = byte;
-        }
-        while(zigzag != 0);
-
-        return addEncodedBytes(ctx, buffer, count);
-    }
-
-    int64_t signedValue = (int64_t)significand;
-    if(significandSign < 0)
-    {
-        signedValue = -signedValue;
-    }
-    return encodeZigzagLEB128(ctx, signedValue);
-}
 
 // Track state changes after adding a value to an object
 static void onValueAdded(KSBONJSONEncodeContext* const ctx)
@@ -492,8 +439,24 @@ ksbonjson_encodeStatus ksbonjson_addBigNumber(KSBONJSONEncodeContext* const ctx,
     // Emit exponent as zigzag LEB128
     PROPAGATE_ERROR(encodeZigzagLEB128(ctx, (int64_t)value.exponent));
 
-    // Emit significand as zigzag LEB128 (incorporating the sign)
-    PROPAGATE_ERROR(encodeSignedZigzagLEB128(ctx, value.significandSign, value.significand));
+    if(value.significand == 0)
+    {
+        // Zero significand: signed_length = 0, no magnitude bytes
+        PROPAGATE_ERROR(encodeZigzagLEB128(ctx, 0));
+    }
+    else
+    {
+        // Compute byte count for magnitude
+        const size_t byteCount = requiredUnsignedIntegerBytesMin1(value.significand);
+        // signed_length: positive if significand positive, negative if negative
+        const int64_t signedLength = (value.significandSign < 0) ? -(int64_t)byteCount : (int64_t)byteCount;
+        PROPAGATE_ERROR(encodeZigzagLEB128(ctx, signedLength));
+
+        // Emit magnitude as LE bytes
+        union num64_bits bits;
+        bits.u64 = toLittleEndian(value.significand);
+        PROPAGATE_ERROR(addEncodedBytes(ctx, bits.b, byteCount));
+    }
 
     onValueAdded(ctx);
     return KSBONJSON_ENCODE_OK;
